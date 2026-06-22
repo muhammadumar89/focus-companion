@@ -1,0 +1,11 @@
+# personal data — your ratings & viewing history (stays on your machine)
+taste.json
+ratings.jsonl
+
+# logs
+*.log
+
+# backups, caches, OS cruft
+*.bak
+__pycache__/
+.DS_Store

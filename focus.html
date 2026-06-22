@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus Companion</title>
+<style>
+  :root{
+    --bg0:#08070f; --bg1:#1a1636;
+    --accent:#8b7bff; --accent2:#ff9d6c;
+    --text:#f3f1ff; --muted:#9a96c4;
+    --card:rgba(255,255,255,.045); --line:rgba(255,255,255,.09);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--text); background:var(--bg0); overflow:hidden;
+  }
+  #bg{
+    position:fixed;inset:0;z-index:-1;
+    background:
+      radial-gradient(60% 55% at 18% 12%, rgba(139,123,255,.30), transparent 60%),
+      radial-gradient(55% 50% at 85% 88%, rgba(255,157,108,.16), transparent 60%),
+      radial-gradient(120% 120% at 50% 0%, var(--bg1) 0%, var(--bg0) 62%);
+    animation:drift 26s ease-in-out infinite alternate;
+  }
+  @keyframes drift{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(-18deg) saturate(1.15)}}
+  .app{height:100vh;display:flex;flex-direction:column;padding:26px clamp(22px,5vw,64px)}
+
+  header{display:flex;justify-content:space-between;align-items:flex-start}
+  .brand{font-size:12px;letter-spacing:.22em;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:9px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 14px 2px var(--accent);animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.45;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
+  .timer-box{text-align:right}
+  #timer{font-size:30px;font-weight:600;font-variant-numeric:tabular-nums}
+  .timer-label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+
+  main{flex:1;display:flex;align-items:safe center;justify-content:center;min-height:0;overflow-y:auto;padding:8px 0}
+  .view{width:100%;max-width:900px;text-align:center}
+  .hidden{display:none!important}
+
+  /* quotes */
+  .qmark{font-size:90px;line-height:.4;color:var(--accent);opacity:.4;font-family:Georgia,serif;margin-bottom:14px}
+  #quoteText{font-size:clamp(26px,3.6vw,46px);font-weight:600;line-height:1.32;transition:opacity .45s ease,transform .45s ease}
+  #quoteAuthor{margin-top:26px;font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:600;transition:opacity .45s ease}
+  .fade-out{opacity:0!important;transform:translateY(8px)}
+
+  /* watch / launcher */
+  .watch-head{font-size:clamp(20px,2.4vw,28px);font-weight:600;margin-bottom:8px}
+  .watch-sub{font-size:14px;color:var(--muted);line-height:1.55;max-width:560px;margin:0 auto 22px}
+  .sections{display:flex;gap:24px;justify-content:center;align-items:flex-start;flex-wrap:wrap;text-align:left}
+  .section{flex:1 1 320px;max-width:380px;min-width:270px}
+  .section-label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 0 11px 4px}
+  .people{display:flex;flex-direction:column;gap:9px}
+  a.person{
+    display:flex;align-items:center;gap:14px;text-align:left;text-decoration:none;
+    background:var(--card);border:1px solid var(--line);border-radius:13px;
+    padding:12px 15px;color:var(--text);transition:all .16s ease;
+  }
+  a.person:hover{border-color:var(--accent);background:rgba(139,123,255,.10);transform:translateY(-2px)}
+  .p-badge{
+    width:38px;height:38px;flex:none;border-radius:10px;
+    background:linear-gradient(135deg,var(--accent),#a99bff);
+    color:#0c0a1c;font-weight:800;font-size:16px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .p-badge.topic{background:linear-gradient(135deg,var(--accent2),#ffc79c)}
+  .p-text{flex:1;min-width:0}
+  .p-name{font-size:15px;font-weight:700;line-height:1.25}
+  .p-note{font-size:12px;color:var(--muted);margin-top:2px}
+  .p-arrow{color:var(--muted);font-size:15px;flex:none}
+  a.person:hover .p-arrow{color:var(--accent)}
+  .section.topics a.person:hover{border-color:var(--accent2);background:rgba(255,157,108,.10)}
+  .section.topics a.person:hover .p-arrow{color:var(--accent2)}
+
+  /* inline auto-player */
+  #player-wrap{position:relative;width:100%;max-width:300px;margin:0 auto 12px;aspect-ratio:9/16;
+    border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#000;
+    box-shadow:0 22px 60px -20px rgba(0,0,0,.85)}
+  #player-wrap iframe,#ytplayer{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .sound-overlay{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:7px;cursor:pointer;color:#fff;font-weight:700;font-size:21px;text-align:center;
+    background:linear-gradient(0deg,rgba(8,7,15,.55),rgba(8,7,15,.22));transition:opacity .25s ease}
+  .sound-overlay small{font-weight:500;font-size:13px;color:var(--muted)}
+  .sound-overlay .spk{font-size:42px;line-height:1;filter:drop-shadow(0 0 18px rgba(139,123,255,.75));animation:pulse 2.4s ease-in-out infinite}
+  .player-ctrls{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:18px}
+  #nextClip{background:var(--card);border:1px solid var(--line);color:var(--text);font-size:13px;font-weight:600;
+    padding:9px 16px;border-radius:10px;cursor:pointer;font-family:inherit}
+  #nextClip:hover{border-color:var(--accent);color:#fff}
+  .rate-btn{background:var(--card);border:1px solid var(--line);color:var(--text);font-size:16px;line-height:1;
+    padding:8px 13px;border-radius:10px;cursor:pointer;font-family:inherit;transition:all .14s ease}
+  .rate-btn:hover{border-color:var(--accent);transform:translateY(-1px)}
+  #likeBtn.active{border-color:var(--accent);background:rgba(139,123,255,.20)}
+  #dislikeBtn.active{border-color:var(--accent2);background:rgba(255,157,108,.20)}
+  #nowPlaying{font-size:12.5px;color:var(--muted)}
+
+  /* footer */
+  footer{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-top:18px}
+  .modes{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:5px}
+  .mode{background:transparent;color:var(--muted);font-size:13px;font-weight:600;padding:8px 18px;border-radius:8px;cursor:pointer;border:0;font-family:inherit}
+  .mode.active{background:var(--accent);color:#0c0a1c}
+  .ctrls{display:flex;gap:10px}
+  .ctrl{background:var(--card);border:1px solid var(--line);color:var(--text);font-size:13px;font-weight:600;padding:10px 16px;border-radius:10px;cursor:pointer;font-family:inherit}
+  .ctrl:hover{border-color:var(--accent);color:#fff}
+  .ctrl.primary{background:var(--accent);color:#0c0a1c;border-color:var(--accent)}
+  .stats{font-size:12.5px;color:var(--muted);min-width:210px;text-align:right}
+
+  /* snapback */
+  .snapback{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 40%,rgba(26,22,54,.96),rgba(8,7,15,.98))}
+  .sb-card{text-align:center;animation:pop .32s cubic-bezier(.2,.9,.3,1.4)}
+  @keyframes pop{from{transform:scale(.8);opacity:0}to{transform:none;opacity:1}}
+  .check{width:88px;height:88px;border-radius:50%;margin:0 auto 24px;
+    background:linear-gradient(120deg,var(--accent),#a99bff);color:#0c0a1c;font-size:46px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 18px 50px -10px rgba(139,123,255,.7)}
+  .sb-card h2{font-size:30px;margin-bottom:10px}
+  .sb-card p{color:var(--muted);font-size:15px;margin-bottom:26px}
+  .btn-lg{background:linear-gradient(120deg,var(--accent),#a99bff);color:#0c0a1c;font-size:16px;font-weight:700;
+    padding:15px 30px;border-radius:13px;border:0;cursor:pointer;font-family:inherit}
+  .btn-lg:hover{transform:translateY(-2px)}
+
+  #toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:#221d44;border:1px solid var(--line);color:var(--text);padding:12px 20px;border-radius:11px;
+    font-size:13.5px;z-index:70;opacity:0;transition:all .3s ease;pointer-events:none}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+
+<div class="app">
+  <header>
+    <div class="brand"><span class="dot"></span>FOCUS&nbsp;COMPANION</div>
+    <div class="timer-box">
+      <div id="timer">0:00</div>
+      <div class="timer-label">agent is thinking</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- QUOTES -->
+    <section id="quoteView" class="view">
+      <div class="qmark">&ldquo;</div>
+      <blockquote id="quoteText">&hellip;</blockquote>
+      <div id="quoteAuthor"></div>
+    </section>
+
+    <!-- WATCH / LAUNCHER -->
+    <section id="watchView" class="view hidden">
+      <div id="player-wrap">
+        <div id="ytplayer"></div>
+        <div id="soundOverlay" class="sound-overlay">
+          <span class="spk">&#128266;</span>
+          <span>Tap for sound</span>
+          <small>a clip is already playing &mdash; tap to hear it</small>
+        </div>
+      </div>
+      <div class="player-ctrls">
+        <button id="likeBtn" class="rate-btn" title="More like this (↑)">&#128077;</button>
+        <button id="dislikeBtn" class="rate-btn" title="Less like this (↓)">&#128078;</button>
+        <button id="nextClip">&#9197;&nbsp; Next clip</button>
+        <span id="nowPlaying"></span>
+      </div>
+      <div class="watch-sub">
+        A clip auto-plays each time the agent thinks. Tap once for sound, watch a bit, then come back.
+        Hit &#128077;/&#128078; (or &uarr;/&darr;) to teach it what you like &mdash; it learns and shows you more of that.
+        Want a specific person or idea? Pick one below &mdash; it opens a fresh search.
+      </div>
+      <div class="sections">
+        <div class="section">
+          <div class="section-label">By person</div>
+          <div class="people" id="people"></div>
+        </div>
+        <div class="section topics">
+          <div class="section-label">By topic</div>
+          <div class="people" id="topics"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="modes">
+      <button class="mode active" data-mode="quote">Quotes</button>
+      <button class="mode" data-mode="watch">Clips</button>
+    </div>
+    <div class="ctrls">
+      <button class="ctrl" id="actionBtn">New quote</button>
+      <button class="ctrl primary" id="backBtn">I&rsquo;m back &#10003;</button>
+    </div>
+    <div class="stats" id="stats"></div>
+  </footer>
+</div>
+
+<!-- SNAPBACK -->
+<div id="snapback" class="snapback hidden">
+  <div class="sb-card">
+    <div class="check">&#10003;</div>
+    <h2>Welcome back</h2>
+    <p id="snapbackStat"></p>
+    <button class="btn-lg" id="resumeBtn">Back to focus</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ====================== CONTENT ====================== */
+const QUOTES = [
+  {t:"Your time is limited, so don’t waste it living someone else’s life.", a:"Steve Jobs"},
+  {t:"Stay hungry. Stay foolish.", a:"Steve Jobs"},
+  {t:"The only way to do great work is to love what you do.", a:"Steve Jobs"},
+  {t:"Innovation distinguishes between a leader and a follower.", a:"Steve Jobs"},
+  {t:"I’m convinced that about half of what separates the successful entrepreneurs from the non-successful ones is pure perseverance.", a:"Steve Jobs"},
+  {t:"Design is not just what it looks like and feels like. Design is how it works.", a:"Steve Jobs"},
+  {t:"When something is important enough, you do it even if the odds are not in your favor.", a:"Elon Musk"},
+  {t:"Persistence is very important. You should not give up unless you are forced to give up.", a:"Elon Musk"},
+  {t:"Failure is an option here. If things are not failing, you are not innovating enough.", a:"Elon Musk"},
+  {t:"The first step is to establish that something is possible; then probability will occur.", a:"Elon Musk"},
+  {t:"I think it’s possible for ordinary people to choose to be extraordinary.", a:"Elon Musk"},
+  {t:"An entrepreneur is someone who jumps off a cliff and builds a plane on the way down.", a:"Reid Hoffman"},
+  {t:"If you decide that you’re going to do only the things you know are going to work, you’re going to leave a lot of opportunity on the table.", a:"Jeff Bezos"},
+  {t:"The way to get startup ideas is not to try to think of startup ideas. It’s to look for problems, preferably problems you have yourself.", a:"Paul Graham"},
+  {t:"The most important skill for getting rich is becoming a perpetual learner.", a:"Naval Ravikant"},
+  {t:"Whether you think you can, or you think you can’t — you’re right.", a:"Henry Ford"},
+  {t:"It does not matter how slowly you go as long as you do not stop.", a:"Confucius"},
+  {t:"Amateurs sit and wait for inspiration. The rest of us just get up and go to work.", a:"Stephen King"},
+  {t:"Everything that is not forbidden by laws of nature is achievable, given the right knowledge.", a:"David Deutsch"},
+  {t:"Problems are inevitable. Problems are soluble.", a:"David Deutsch"},
+  {t:"The first principle is that you must not fool yourself — and you are the easiest person to fool.", a:"Richard Feynman"},
+  {t:"I would rather have questions that can't be answered than answers that can't be questioned.", a:"Richard Feynman"}
+];
+
+/* Each button opens a YouTube search in a new tab. Every click picks a random
+   phrasing from that person's list, so you get different videos each time.
+   Want different people or search terms? Just ask. */
+const PEOPLE = [
+  {name:"Steve Jobs", note:"Vision, craft, and staying hungry", queries:[
+    "steve jobs motivation","steve jobs inspirational speech","steve jobs best advice",
+    "steve jobs life lessons","steve jobs on success","steve jobs interview wisdom",
+    "steve jobs stay hungry stay foolish","steve jobs mindset"]},
+  {name:"Elon Musk", note:"Persistence when the odds are against you", queries:[
+    "elon musk motivation","elon musk never give up","elon musk inspirational speech",
+    "elon musk best advice","elon musk on failure","elon musk work ethic",
+    "elon musk mindset","elon musk life lessons"]},
+  {name:"Naval Ravikant", note:"Clear thinking on wealth and life", queries:[
+    "naval ravikant motivation","naval ravikant wisdom","naval ravikant on happiness",
+    "naval ravikant on wealth","naval ravikant life advice","naval ravikant mindset",
+    "naval ravikant best moments","naval ravikant philosophy"]},
+  {name:"David Goggins", note:"Pure discipline and grit", queries:[
+    "david goggins motivation","david goggins discipline","david goggins stay hard",
+    "david goggins mental toughness","david goggins best speech","david goggins never quit",
+    "david goggins mindset","david goggins motivational speech"]},
+  {name:"Kobe Bryant", note:"Mamba mentality", queries:[
+    "kobe bryant mamba mentality","kobe bryant motivation","kobe bryant work ethic",
+    "kobe bryant best interview","kobe bryant on greatness","kobe bryant mindset",
+    "kobe bryant inspirational","kobe bryant advice"]},
+  {name:"David Deutsch", note:"Good explanations & the beginning of infinity", queries:[
+    "david deutsch interview","david deutsch beginning of infinity","david deutsch constructor theory",
+    "david deutsch knowledge creation","david deutsch fabric of reality","david deutsch optimism",
+    "david deutsch good explanations","david deutsch naval ravikant"]},
+  {name:"Chiara Marletto", note:"Constructor theory & the science of can & can't", queries:[
+    "chiara marletto constructor theory","chiara marletto science of can and cant","chiara marletto interview",
+    "chiara marletto counterfactuals","chiara marletto physics talk","chiara marletto lecture"]},
+  {name:"Richard Feynman", note:"The pleasure of finding things out", queries:[
+    "richard feynman interview","richard feynman pleasure of finding things out","richard feynman curiosity",
+    "richard feynman explains","richard feynman lectures","richard feynman ways of thinking",
+    "richard feynman beauty of a flower","richard feynman scientific method"]},
+  {name:"Sara Walker", note:"Assembly theory & what life is", queries:[
+    "sara walker assembly theory","sara walker origin of life","sara walker what is life",
+    "sara walker interview","sara walker physics of life","sara walker lex fridman"]},
+  {name:"Jeff Bezos", note:"Long-term thinking & customer obsession", queries:[
+    "jeff bezos advice","jeff bezos motivation","jeff bezos interview wisdom",
+    "jeff bezos regret minimization","jeff bezos on success","jeff bezos long term thinking",
+    "jeff bezos best advice","jeff bezos mindset"]},
+  {name:"Jensen Huang", note:"Resilience and the long game", queries:[
+    "jensen huang advice","jensen huang motivation","jensen huang interview",
+    "jensen huang on success","jensen huang work ethic","jensen huang resilience",
+    "jensen huang best speech","jensen huang mindset"]},
+  {name:"Stephen Wolfram", note:"The computational universe", queries:[
+    "stephen wolfram interview","stephen wolfram computational universe","stephen wolfram ruliad",
+    "stephen wolfram physics project","stephen wolfram computational thinking","stephen wolfram a new kind of science",
+    "stephen wolfram lecture","stephen wolfram talk"]}
+];
+
+/* Topic-based searches — frontier ideas in intelligence, computation & learning. */
+const TOPICS = [
+  {name:"Recursive self-improvement", note:"AI that makes itself smarter", queries:[
+    "recursive self improvement AI","recursive self improvement explained","self improving AI",
+    "intelligence explosion explained","AI improving itself","seed AI intelligence explosion"]},
+  {name:"Continual learning", note:"Systems that never stop learning", queries:[
+    "continual learning AI","continual learning machine learning","lifelong learning AI",
+    "catastrophic forgetting explained","continual learning explained","continual learning neural networks"]},
+  {name:"Wolfram & computation", note:"The computational universe", queries:[
+    "Stephen Wolfram computation","Stephen Wolfram computational universe","Stephen Wolfram a new kind of science",
+    "Wolfram physics project","Stephen Wolfram cellular automata","Stephen Wolfram computational irreducibility"]},
+  {name:"Artificial general intelligence", note:"The road to AGI", queries:[
+    "artificial general intelligence explained","AGI explained","path to AGI",
+    "what is AGI","AGI discussion","road to artificial general intelligence"]},
+  {name:"First-principles thinking", note:"Reason up from the fundamentals", queries:[
+    "first principles thinking","first principles thinking explained","thinking from first principles",
+    "first principles reasoning","first principles problem solving","reason from first principles"]},
+  {name:"Emergence & complexity", note:"Simple rules, complex worlds", queries:[
+    "emergence complexity science","emergence explained","complexity theory explained",
+    "complex systems explained","emergent behavior explained","science of complexity"]},
+  {name:"Constructor theory", note:"The physics of what's possible & impossible", queries:[
+    "constructor theory explained","constructor theory david deutsch","constructor theory chiara marletto",
+    "what is constructor theory","constructor theory physics","constructor theory counterfactuals"]},
+  {name:"The Beginning of Infinity", note:"Knowledge has no upper bound", queries:[
+    "beginning of infinity david deutsch","beginning of infinity explained","good explanations deutsch",
+    "fallibilism explained","problems are soluble deutsch","unlimited growth of knowledge"]},
+  {name:"Assembly theory", note:"Measuring how complex life gets", queries:[
+    "assembly theory explained","assembly theory sara walker","assembly theory lee cronin",
+    "assembly theory origin of life","what is assembly theory","assembly index explained"]},
+  {name:"Quantum computation", note:"Computing with the multiverse", queries:[
+    "quantum computing explained","quantum computation david deutsch","how quantum computers work",
+    "quantum computing for beginners","quantum algorithms explained","quantum parallelism explained"]}
+];
+
+/* Short-form clips (YouTube Shorts) for the inline auto-player — picked at random,
+   muted autoplay on open, one tap for sound, looped until you hit Next. Add/remove
+   freely; the id is the part after youtube.com/shorts/. cerebral picks carry w:2 so
+   they surface ~twice as often. If one ever shows "unavailable", just delete it. */
+/* Each clip carries its LANES — person + vibe. Rewards flow up to these lanes,
+   so liking a clip lifts its siblings, and the agent knows which lanes to grow
+   when it fetches new shorts. `let` (not const) so the deck can be expanded. */
+let VIDEOS = [
+  /* — motivational — */
+  {id:"kHvXpDPd9pk", who:"David Goggins — No Days Off", person:"David Goggins", vibe:"grit"},
+  {id:"OhWDcTBSMc4", who:"David Goggins — They Hate Your Success", person:"David Goggins", vibe:"grit"},
+  {id:"oKEqarvUAvw", who:"David Goggins — Because You're Not", person:"David Goggins", vibe:"grit"},
+  {id:"M2Ljr16KyuI", who:"Elon Musk — I Don't Ever Give Up", person:"Elon Musk", vibe:"drive"},
+  {id:"slMAem1MJk8", who:"Elon Musk — Hard Work Mindset", person:"Elon Musk", vibe:"drive"},
+  {id:"2SZJWmdEZOI", who:"Elon Musk — Mindset Will Change Your Life", person:"Elon Musk", vibe:"drive"},
+  {id:"y6AlvUSMpho", who:"Naval Ravikant — Best Advice", person:"Naval Ravikant", vibe:"wisdom"},
+  {id:"jIkiQldezcw", who:"Naval Ravikant — Most Valuable Advice", person:"Naval Ravikant", vibe:"wisdom"},
+  {id:"A4FcqgLB1M4", who:"Naval Ravikant — Advice To All", person:"Naval Ravikant", vibe:"wisdom"},
+  {id:"pESVJMttZXQ", who:"Kobe Bryant — Essence of Mamba", person:"Kobe Bryant", vibe:"grit"},
+  {id:"lHIyPJmtkVw", who:"Kobe Bryant — The Mamba Mentality", person:"Kobe Bryant", vibe:"grit"},
+  {id:"Kzb6cDeosAo", who:"Kobe Bryant — Mamba as a System", person:"Kobe Bryant", vibe:"grit"},
+  {id:"LsIcMc9_yP8", who:"Steve Jobs — Best Motivation", person:"Steve Jobs", vibe:"vision"},
+  {id:"KFQZzhwz4Z0", who:"Steve Jobs — Life Advice", person:"Steve Jobs", vibe:"vision"},
+  {id:"78KYzwhiNok", who:"Steve Jobs — The Legend Mindset", person:"Steve Jobs", vibe:"vision"},
+  {id:"KOeyEIh7LIE", who:"Jensen Huang — AI Advice for Young People", person:"Jensen Huang", vibe:"drive"},
+  {id:"k2JZgWIbeFQ", who:"Jensen Huang — Make a Unique Contribution", person:"Jensen Huang", vibe:"drive"},
+  {id:"9lQpF3_WmkI", who:"Jensen Huang — Master AI", person:"Jensen Huang", vibe:"drive"},
+  {id:"HzOhrgrZjHA", who:"Jeff Bezos — No.1 Advice for Entrepreneurs", person:"Jeff Bezos", vibe:"vision"},
+  {id:"3TCQ7ftEXRo", who:"Jeff Bezos — Choose a Career You're Passionate About", person:"Jeff Bezos", vibe:"vision"},
+  {id:"5ZCmM2XRLvM", who:"Jeff Bezos — Best Advice", person:"Jeff Bezos", vibe:"vision"},
+  /* — cerebral (weighted up) — */
+  {id:"a1Wsy4jccNA", who:"Richard Feynman — Get Comfortable Not Knowing", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"b0Eq8Aib4GU", who:"Richard Feynman — In 60 Seconds", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"57OHAafYJVE", who:"Richard Feynman — The Four-Step Method", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"_3cxNAzpLmA", who:"Richard Feynman — The Reading Habit", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"0igk-GNnqGw", who:"David Deutsch — AI & Super-Intelligence", person:"David Deutsch", vibe:"ideas", w:2},
+  {id:"Isp9lcqAsss", who:"David Deutsch — The Beginning of Infinity", person:"David Deutsch", vibe:"ideas", w:2},
+  {id:"8rlpQd5heh8", who:"First Principles — The Secret", person:"First Principles", vibe:"ideas", w:2},
+  {id:"omsolF4esoY", who:"First Principles — How to Think From Them", person:"First Principles", vibe:"ideas", w:2},
+  /* — expanded 2026-06-21 from your 👍 on Feynman / the "ideas" lane — */
+  {id:"RZPlIwCTfIQ", who:"Richard Feynman — The Curious Feynman Point", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"2oqJzaQeusc", who:"Richard Feynman — The Technique for Studying", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"kHyEaa64roA", who:"Richard Feynman — The Ultimate Test of Understanding", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"_opnChqv44c", who:"Richard Feynman — Learning the Feynman Way", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"pMKqTTlFW9A", who:"Carl Sagan — On Children's Lost Curiosity", person:"Carl Sagan", vibe:"ideas", w:2},
+  {id:"2Dukoqs-Fzg", who:"Carl Sagan — The Education System Destroys Curiosity", person:"Carl Sagan", vibe:"ideas", w:2},
+  {id:"L_zH3o-22JU", who:"Carl Sagan — Science as a Way of Thinking", person:"Carl Sagan", vibe:"ideas", w:2},
+  /* — expanded 2026-06-21 from your top lanes: vision (Jobs/Bezos) + wisdom (Naval) — */
+  {id:"DwYJVjBgThc", who:"Jeff Bezos — The Mindset That Built Amazon", person:"Jeff Bezos", vibe:"vision"},
+  {id:"stUXqY02ow8", who:"Jeff Bezos — Never Get Stuck on a Decision", person:"Jeff Bezos", vibe:"vision"},
+  {id:"KoOYdDPIyNw", who:"Jeff Bezos — A Life of Service & Adventure", person:"Jeff Bezos", vibe:"vision"},
+  {id:"7cVPTM_EYtM", who:"Steve Jobs — How He Found the Vision for Apple", person:"Steve Jobs", vibe:"vision"},
+  {id:"_7YKuOwZegs", who:"Steve Jobs — Why Intuition Mattered to Him", person:"Steve Jobs", vibe:"vision"},
+  {id:"yxZRPVD4rV0", who:"Steve Jobs — On Passion", person:"Steve Jobs", vibe:"vision"},
+  {id:"b1UQdVijtHU", who:"Naval Ravikant — The Philosophy of Naval", person:"Naval Ravikant", vibe:"wisdom"},
+  {id:"awdWc04m1ZE", who:"Naval Ravikant — Combining Diverse Interests", person:"Naval Ravikant", vibe:"wisdom"},
+  /* — auto-expanded 2026-06-21 (top lanes: Richard Feynman, Steve Jobs, Jeff Bezos) — */
+  {id:"qZdth96UA-c", who:"How to Learn Anything Faster - Richard Feynman.", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"LIxvQMhttq4", who:"Richard Feynman — The Essence Of Science In 60 Seconds (Richard Fe", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"qIms7loBZnw", who:"Steve Jobs talks about hiring management at Appl", person:"Steve Jobs", vibe:"vision"},
+  {id:"6rCX8D2SZag", who:"Steve Jobs - About the top and the bottom line", person:"Steve Jobs", vibe:"vision"},
+  {id:"NqVoOC2azZI", who:"How do you deal with stress Jeff Bezos", person:"Jeff Bezos", vibe:"vision"},
+  {id:"uHvD0DVcKAw", who:"Amazon CEO Jeff Bezos on Customer Obsession", person:"Jeff Bezos", vibe:"vision"},
+  /* — auto-expanded 2026-06-22 (top lanes: Steve Jobs, Richard Feynman, Jeff Bezos) — */
+  {id:"7mNtkzUTjYM", who:"Just Ask for Help said Steve Jobs | Motivational", person:"Steve Jobs", vibe:"vision"},
+  {id:"95xkeaFH0Cw", who:"Richard Feynman on Becoming a Scientist", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"izo-wCS1Hp0", who:"Richard Feynman — Cracking the Code of the Universe: Richard Feynm", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"ndP8MBaeaDQ", who:"Jeff Bezos — Amazon new launch | Dustbin with technology | Sm", person:"Jeff Bezos", vibe:"vision"},
+  {id:"fTwXS2H_iJo", who:"Jeff Bezos on Why It's Always Day 1 at Amazon", person:"Jeff Bezos", vibe:"vision"}
+];
+
+/* ====================== STATE ====================== */
+const LS_STATS = "fc_stats_v2";
+let state = { mode:"quote", started:false, sessionStart:0, timerInt:null, quoteInt:null, quoteIdx:-1 };
+
+/* ====================== HELPERS ====================== */
+const $ = id => document.getElementById(id);
+function fmt(s){ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
+function toast(msg){
+  const el=$("toast"); el.textContent=msg; el.classList.add("show");
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("show"),3400);
+}
+
+/* ====================== STATS ====================== */
+function loadStats(){
+  let s; try{ s=JSON.parse(localStorage.getItem(LS_STATS)); }catch(e){}
+  const today=new Date().toISOString().slice(0,10);
+  if(!s || s.date!==today) s={date:today,sessions:0,seconds:0};
+  return s;
+}
+function saveStats(s){ try{ localStorage.setItem(LS_STATS,JSON.stringify(s)); }catch(e){} }
+function renderStats(){
+  const s=loadStats();
+  if(s.sessions===0){ $("stats").textContent="Your focus, reclaimed — one wait at a time."; }
+  else{
+    $("stats").textContent="🔥 "+s.sessions+" focus break"+(s.sessions===1?"":"s")
+      +" · "+Math.round(s.seconds/60)+" min reclaimed today";
+  }
+}
+
+/* ====================== SESSION ====================== */
+function startSession(){
+  if(state.started) return;
+  state.started=true;
+  state.sessionStart=Date.now();
+  clearInterval(state.timerInt);
+  state.timerInt=setInterval(tick,1000);
+  tick();
+  if(state.mode==="quote") startQuotes();
+}
+function endSession(){
+  if(!state.started) return;
+  const secs=(Date.now()-state.sessionStart)/1000;
+  state.started=false;
+  clearInterval(state.timerInt);
+  clearInterval(state.quoteInt);
+  if(secs>=5){
+    const s=loadStats();
+    s.sessions+=1; s.seconds+=Math.round(secs);
+    saveStats(s); renderStats();
+  }
+  return secs;
+}
+function tick(){ $("timer").textContent=fmt((Date.now()-state.sessionStart)/1000); }
+
+/* ====================== QUOTES ====================== */
+function startQuotes(){
+  clearInterval(state.quoteInt);
+  nextQuote();
+  state.quoteInt=setInterval(nextQuote,13000);
+}
+function nextQuote(){
+  let i; do{ i=Math.floor(Math.random()*QUOTES.length); }while(QUOTES.length>1 && i===state.quoteIdx);
+  state.quoteIdx=i;
+  const q=QUOTES[i], t=$("quoteText"), a=$("quoteAuthor");
+  t.classList.add("fade-out"); a.classList.add("fade-out");
+  setTimeout(()=>{
+    t.textContent=q.t; a.textContent=q.a;
+    t.classList.remove("fade-out"); a.classList.remove("fade-out");
+  },450);
+}
+
+/* ====================== WATCH / LAUNCHER ====================== */
+function ytURL(item){
+  const q=item.queries[Math.floor(Math.random()*item.queries.length)];
+  return "https://www.youtube.com/results?search_query="+encodeURIComponent(q);
+}
+function buildList(arr, containerId, badgeClass){
+  const wrap=$(containerId);
+  wrap.innerHTML="";
+  arr.forEach(item=>{
+    const a=document.createElement("a");
+    a.className="person";
+    a.href=ytURL(item);
+    a.target="_blank";
+    a.rel="noopener noreferrer";
+    a.innerHTML='<span class="p-badge '+badgeClass+'">'+item.name.charAt(0)+'</span>'
+      +'<span class="p-text"><span class="p-name">'+item.name+'</span>'
+      +'<span class="p-note">'+item.note+'</span></span>'
+      +'<span class="p-arrow">&#8599;</span>';
+    /* re-roll the search the instant before each click, so it lands on a
+       different results page every time — never the same videos twice */
+    a.addEventListener("pointerdown",()=>{ a.href=ytURL(item); });
+    a.addEventListener("click",()=>{
+      toast("Opening a fresh "+item.name+" search — watch one, then come back here.");
+    });
+    wrap.appendChild(a);
+  });
+}
+function buildPeople(){
+  buildList(PEOPLE,"people","");
+  buildList(TOPICS,"topics","topic");
+}
+
+/* ====================== INLINE AUTO-PLAYER ====================== */
+/* Plain YouTube embed iframe — muted autoplay is allowed on a freshly opened
+   page, so a clip starts the moment you land. Tapping "for sound" reloads the
+   same clip unmuted (your tap is the user gesture browsers require). No external
+   API, so it's reliable on file:// pages. */
+let lastVid=-1, soundUnlocked=false, currentVid=null;
+
+/* ---- Phase 1 taste memory: 👍/👎 + seen-counts, saved in localStorage ----
+   This is the FAST loop: every rating instantly reshapes what you get next.
+   Per clip we keep {up, down, seen, last}. A clip's pick-weight blends its
+   curated base weight (w), your reward (up−down), how often you've seen it
+   (variety), and a freshness boost for clips you've never seen. */
+const LS_TASTE = "fc_taste_v1";
+let TASTE = (function(){ try{ return JSON.parse(localStorage.getItem(LS_TASTE))||{}; }catch(e){ return {}; } })();
+function saveTaste(){ try{ localStorage.setItem(LS_TASTE, JSON.stringify(TASTE)); }catch(e){} }
+function syncTaste(){
+  /* push the WHOLE browser memory to the bridge -> taste.json, so the agent
+     sees everything you've ever rated, not just clicks made after the bridge. */
+  try{ fetch("/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(TASTE)}); }catch(e){}
+}
+function tasteFor(id){ return TASTE[id] || (TASTE[id]={up:0,down:0,seen:0,last:0}); }
+
+const RECENT = [];                                   // recently-shown indices (anti-repeat)
+function avoidWindow(){ return Math.min(6, Math.max(1, Math.floor(VIDEOS.length/3))); }
+
+/* Sum your net reward per lane (person & vibe) across the whole deck, so a lane's
+   popularity can lift clips you haven't personally rated yet. */
+function laneStats(){
+  const person={}, vibe={};
+  VIDEOS.forEach(v=>{
+    const t=TASTE[v.id]; if(!t) return;
+    const net=(t.up||0)-(t.down||0);
+    if(v.person) person[v.person]=(person[v.person]||0)+net;
+    if(v.vibe)   vibe[v.vibe]   =(vibe[v.vibe]  ||0)+net;
+  });
+  return {person, vibe};
+}
+
+function clipWeight(i, lanes){
+  const v=VIDEOS[i], t=tasteFor(v.id);
+  const base=v.w||1;
+  const net=(t.up||0)-(t.down||0);
+  let taste;
+  if(net<=-2) taste=0.03;                            // two net dislikes ≈ hidden
+  else taste=Math.min(6, Math.max(0.2, Math.pow(1.9, net)));
+  /* lane lift: how much the REST of this clip's lanes are liked (exclude self) */
+  const pNet=(v.person ? (lanes.person[v.person]||0) : 0) - net;
+  const vNet=(v.vibe   ? (lanes.vibe[v.vibe]    ||0) : 0) - net;
+  const lane=Math.min(3, Math.max(0.4, Math.pow(1.25,pNet)*Math.pow(1.12,vNet)));
+  const variety=1/(1+0.15*(t.seen||0));              // gently favor less-seen
+  const fresh=(t.seen||0)===0 ? 1.5 : 1;             // surface never-seen clips first
+  return base*taste*lane*variety*fresh;
+}
+
+function pickVid(){
+  const lanes=laneStats();
+  const win=avoidWindow(), recent=new Set(RECENT.slice(-win));
+  let cands=VIDEOS.map((v,i)=>i).filter(i=>!recent.has(i));
+  if(!cands.length) cands=VIDEOS.map((v,i)=>i);
+  const weighted=cands.map(i=>({i, w:clipWeight(i, lanes)}));
+  const total=weighted.reduce((s,c)=>s+c.w,0);
+  let r=Math.random()*total, idx=weighted[weighted.length-1].i;
+  for(const c of weighted){ r-=c.w; if(r<=0){ idx=c.i; break; } }
+  RECENT.push(idx); if(RECENT.length>40) RECENT.shift();
+  lastVid=idx; return VIDEOS[idx];
+}
+
+function markSeen(v){ const t=tasteFor(v.id); t.seen=(t.seen||0)+1; t.last=Date.now(); saveTaste(); }
+
+function postRate(v, dir){
+  /* fire-and-forget to the local bridge so the agent can read it from a file.
+     harmless if the bridge isn't running — the browser memory still works. */
+  try{
+    fetch("/rate", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({id:v.id, dir, who:v.who, person:v.person||"", vibe:v.vibe||"", ts:Date.now()})});
+  }catch(e){}
+}
+function rate(dir){
+  if(!currentVid) return;
+  const v=currentVid, t=tasteFor(v.id);
+  if(dir>0){ t.up=(t.up||0)+1; toast("More like this 👍"); }
+  else { t.down=(t.down||0)+1; toast("Got it — less like this 👎"); }
+  saveTaste(); postRate(v, dir); syncTaste(); updateRateButtons();
+  if(dir<0) loadRandomClip();                        // skip away from a disliked clip
+}
+function updateRateButtons(){
+  const t=currentVid ? (TASTE[currentVid.id]||{}) : {};
+  const up=t.up||0, down=t.down||0, lb=$("likeBtn"), db=$("dislikeBtn");
+  if(lb) lb.classList.toggle("active", up>down);
+  if(db) db.classList.toggle("active", down>up);
+}
+function showNowPlaying(v){ const el=$("nowPlaying"); if(el) el.textContent="▶ "+v.who; }
+
+function embed(v, muted){
+  currentVid=v;
+  const wrap=$("player-wrap"), old=document.getElementById("ytframe");
+  if(old) old.remove();
+  const f=document.createElement("iframe");
+  f.id="ytframe";
+  f.allow="autoplay; encrypted-media; picture-in-picture; fullscreen";
+  f.setAttribute("allowfullscreen","");
+  f.src="https://www.youtube.com/embed/"+v.id+"?autoplay=1&mute="+(muted?1:0)+
+        "&rel=0&playsinline=1&modestbranding=1&loop=1&playlist="+v.id;
+  wrap.insertBefore(f, $("soundOverlay"));
+  showNowPlaying(v);
+}
+function loadRandomClip(){
+  const v=pickVid();
+  markSeen(v);
+  embed(v, !soundUnlocked);
+  const ov=$("soundOverlay"); if(ov) ov.style.display = soundUnlocked ? "none" : "flex";
+  updateRateButtons();
+}
+function unlockSound(){
+  soundUnlocked=true;
+  if(currentVid) embed(currentVid, false);   // reload unmuted — this tap is the gesture
+  const ov=$("soundOverlay"); if(ov) ov.style.display="none";
+}
+function stopPlayer(){ const f=document.getElementById("ytframe"); if(f) f.remove(); }
+
+/* ====================== MODE ====================== */
+function setMode(m){
+  state.mode=m;
+  document.querySelectorAll(".mode").forEach(b=>b.classList.toggle("active",b.dataset.mode===m));
+  $("quoteView").classList.toggle("hidden",m!=="quote");
+  $("watchView").classList.toggle("hidden",m!=="watch");
+  $("actionBtn").classList.toggle("hidden",m!=="quote");
+  if(m==="quote"){ clearInterval(state.quoteInt); if(state.started) startQuotes(); stopPlayer(); }
+  else{ clearInterval(state.quoteInt); if(!document.getElementById("ytframe")) loadRandomClip(); }
+}
+
+/* ====================== SNAPBACK + CHIME ====================== */
+function chime(){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext, ac=new AC();
+    [784,1175].forEach((f,i)=>{
+      const o=ac.createOscillator(), g=ac.createGain();
+      o.type="sine"; o.frequency.value=f; o.connect(g); g.connect(ac.destination);
+      const t=ac.currentTime+i*0.16;
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(0.32,t+0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);
+      o.start(t); o.stop(t+1.2);
+    });
+  }catch(e){}
+}
+function snapBack(){
+  const secs=endSession()||0;
+  chime();
+  const mins=Math.max(1,Math.round(secs/60));
+  $("snapbackStat").textContent="You held focus for "+fmt(secs)
+    +" — "+mins+" minute"+(mins===1?"":"s")+" you didn’t lose to the feed.";
+  $("snapback").classList.remove("hidden");
+}
+function resumeFocus(){ $("snapback").classList.add("hidden"); startSession(); }
+
+/* ====================== INIT ====================== */
+function init(){
+  buildPeople();
+  setMode("watch");
+  renderStats();
+  syncTaste();          // push existing browser memory to the bridge on every open
+
+  document.querySelectorAll(".mode").forEach(b=>{ b.onclick=()=>setMode(b.dataset.mode); });
+  $("actionBtn").onclick=()=>{ if(state.mode==="quote") nextQuote(); };
+  $("soundOverlay").onclick=unlockSound;
+  $("nextClip").onclick=loadRandomClip;
+  $("likeBtn").onclick=()=>rate(1);
+  $("dislikeBtn").onclick=()=>rate(-1);
+  $("backBtn").onclick=snapBack;
+  $("resumeBtn").onclick=resumeFocus;
+
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Escape"){ snapBack(); return; }
+    if(state.mode==="quote"){
+      if(e.key===" "||e.key==="ArrowRight"){ e.preventDefault(); nextQuote(); }
+    } else {  /* watch mode: ↑ like, ↓ dislike, → / space / n next */
+      if(e.key==="ArrowUp"){ e.preventDefault(); rate(1); }
+      else if(e.key==="ArrowDown"){ e.preventDefault(); rate(-1); }
+      else if(e.key==="ArrowRight"||e.key===" "||e.key==="n"){ e.preventDefault(); loadRandomClip(); }
+    }
+  });
+
+  /* each time the window is shown again, treat it as a fresh thinking wait —
+     and roll a new clip so a reused tab still auto-plays something new */
+  document.addEventListener("visibilitychange",()=>{
+    if(document.hidden){ endSession(); }
+    else { $("timer").textContent="0:00"; startSession(); if(state.mode==="watch"){ soundUnlocked=false; loadRandomClip(); } }
+  });
+  window.addEventListener("focus",()=>{ if(!state.started){ $("timer").textContent="0:00"; startSession(); } });
+
+  $("timer").textContent="0:00";
+  startSession();
+}
+init();
+</script>
+</body>
+</html>
