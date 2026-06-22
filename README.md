@@ -29,13 +29,23 @@ And it **learns**. You give each clip a 👍 or 👎, and it shows you more of w
 
 ## Install
 
+**One line — paste it in your terminal:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/muhammadumar89/focus-companion/main/install.sh | bash
+```
+
+That's the whole thing. It downloads the code, wires the Claude Code hooks, installs `yt-dlp`, and schedules the nightly auto-grow — no questions asked. Send a prompt in Claude Code and the focus page opens.
+
+**Prefer to read the script first?** (recommended if you're security-minded):
+
 ```bash
 git clone https://github.com/muhammadumar89/focus-companion.git
 cd focus-companion
 ./install.sh
 ```
 
-That's it. The installer wires the Claude Code hooks for you and (if you say yes) sets up the nightly auto-grow. Send a prompt in Claude Code and the focus page opens.
+Both do exactly the same thing.
 
 ## Use it
 
