@@ -10,7 +10,7 @@ Runs fully locally via launchd. No Claude binary, no network auth, no hooks.
 """
 import json, os, re, glob, shutil, subprocess, datetime
 
-DIR  = os.path.expanduser("~/focus-companion")
+DIR  = os.path.dirname(os.path.abspath(__file__))   # this script's own folder
 HTML = os.path.join(DIR, "focus.html")
 TASTE = os.path.join(DIR, "taste.json")
 LOG  = os.path.join(DIR, "auto-expand.log")

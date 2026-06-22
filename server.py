@@ -11,7 +11,7 @@ Everything stays on 127.0.0.1 — nothing is exposed to the network.
 """
 import http.server, socketserver, json, os, datetime
 
-DIR = os.path.expanduser("~/focus-companion")
+DIR = os.path.dirname(os.path.abspath(__file__))   # this script's own folder
 PORT = 7654
 RATINGS = os.path.join(DIR, "ratings.jsonl")
 

@@ -8,7 +8,7 @@
 #   - your 👍/👎 ratings get saved to ratings.jsonl for the agent to learn from
 # The bridge is started once in the background and reused after that.
 
-DIR="$HOME/focus-companion"
+DIR="$(cd "$(dirname "$0")" && pwd)"   # this script's own folder
 PORT=7654
 URL="http://localhost:$PORT/focus.html"
 
