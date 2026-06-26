@@ -37,11 +37,12 @@ def find_ytdlp():
     return shutil.which("yt-dlp") or "/opt/homebrew/bin/yt-dlp"
 
 
-def search_shorts(ytdlp, person, n=SEARCH_N):
-    # non-flat + duration filter so we only keep true short-form clips (<=90s)
+def search_shorts(ytdlp, person, n=SEARCH_N, max_dur=90):
+    # non-flat + duration filter. Default <=90s for the tight nightly grow; requests
+    # pass a bigger cap so podcast/interview folks (Lex, Dario…) actually return clips.
     try:
         out = subprocess.run(
-            [ytdlp, "--match-filter", "duration<=90 & duration>0",
+            [ytdlp, "--match-filter", f"duration<={max_dur} & duration>0",
              "--print", "%(id)s\t%(title)s", f"ytsearch{n}:{person} shorts"],
             capture_output=True, text=True, timeout=300).stdout
     except Exception as e:
@@ -69,73 +70,103 @@ def clean_who(person, title):
 
 
 def main():
-    if not (os.path.isfile(TASTE) and os.path.isfile(HTML)):
-        log("missing taste.json or focus.html; skipping")
+    if not os.path.isfile(HTML):
+        log("missing focus.html; skipping")
         return
-    taste = json.load(open(TASTE))
+    taste = json.load(open(TASTE)) if os.path.isfile(TASTE) else {}
     html = open(HTML, encoding="utf-8").read()
-
     ids = set(re.findall(r'\{id:"([^"]+)"', html))
-    if len(ids) >= MAX_DECK:
-        log(f"deck at {len(ids)} (cap {MAX_DECK}); skipping")
-        return
-
-    clip_person = dict(re.findall(r'\{id:"([^"]+)"[^}]*?person:"([^"]*)"', html))
-    person_vibe = {}
-    for cid, p in clip_person.items():
-        m = re.search(r'\{id:"' + re.escape(cid) + r'"[^}]*?vibe:"([^"]*)"', html)
-        if p and m:
-            person_vibe.setdefault(p, m.group(1))
-
-    net = {}
-    for cid, t in taste.items():
-        p = clip_person.get(cid, "")
-        if p:
-            net[p] = net.get(p, 0) + (t.get("up", 0) - t.get("down", 0))
-    top = [p for p, n in sorted(net.items(), key=lambda x: -x[1]) if n > 0][:3]
-    if not top:
-        log("no positively-rated lanes yet; skipping")
-        return
-    log(f"top lanes: {[(p, net[p]) for p in top]}")
-
     ytdlp = find_ytdlp()
-    new = []
-    per_lane = max(2, ADD_PER_RUN // len(top) + 1)
-    for p in top:
-        vibe = person_vibe.get(p, "")
+
+    new = []          # (vid, who, person, vibe)
+    sources = []      # human note of what we grew
+
+    # 1) Fulfill any requests typed into the focus page (uncapped per request).
+    reqf = os.path.join(DIR, "requests.json")
+    reqs, reqs_changed = [], False
+    if os.path.isfile(reqf):
+        try:
+            reqs = json.load(open(reqf))
+        except Exception:
+            reqs = []
+    for r in reqs:
+        if r.get("status") != "pending":
+            continue
+        name = (r.get("name") or "").strip()
+        if not name:
+            r["status"] = "skipped"; reqs_changed = True; continue
+        want = max(1, min(25, int(r.get("count", 20))))
+        log(f"request: up to {want} clips of '{name}'")
         got = 0
-        for vid, title in search_shorts(ytdlp, p):
+        for vid, title in search_shorts(ytdlp, name, n=max(want * 2, 30), max_dur=600):
             if vid in ids:
                 continue
             ids.add(vid)
-            new.append((vid, clean_who(p, title), p, vibe))
+            new.append((vid, clean_who(name, title), name, "ideas"))
             got += 1
-            if got >= per_lane or len(new) >= ADD_PER_RUN:
+            if got >= want:
                 break
-        if len(new) >= ADD_PER_RUN:
-            break
-    new = new[:ADD_PER_RUN]
+        r["status"] = "done"; r["added"] = got; r["done"] = datetime.date.today().isoformat()
+        reqs_changed = True
+        sources.append(f"requested {got}× {name}")
+    if reqs_changed:
+        with open(reqf, "w") as f:
+            json.dump(reqs, f, indent=2, ensure_ascii=False)
+
+    # 2) Grow your top positively-rated lanes (capped), if there's room.
+    if len(ids) < MAX_DECK:
+        clip_person = dict(re.findall(r'\{id:"([^"]+)"[^}]*?person:"([^"]*)"', html))
+        person_vibe = {}
+        for cid, p in clip_person.items():
+            m = re.search(r'\{id:"' + re.escape(cid) + r'"[^}]*?vibe:"([^"]*)"', html)
+            if p and m:
+                person_vibe.setdefault(p, m.group(1))
+        net = {}
+        for cid, t in taste.items():
+            p = clip_person.get(cid, "")
+            if p:
+                net[p] = net.get(p, 0) + (t.get("up", 0) - t.get("down", 0))
+        top = [p for p, n in sorted(net.items(), key=lambda x: -x[1]) if n > 0][:3]
+        if top:
+            log(f"top lanes: {[(p, net[p]) for p in top]}")
+            lane_new, per_lane = [], max(2, ADD_PER_RUN // len(top) + 1)
+            for p in top:
+                vibe, got = person_vibe.get(p, ""), 0
+                for vid, title in search_shorts(ytdlp, p):
+                    if vid in ids:
+                        continue
+                    ids.add(vid)
+                    lane_new.append((vid, clean_who(p, title), p, vibe))
+                    got += 1
+                    if got >= per_lane or len(lane_new) >= ADD_PER_RUN:
+                        break
+                if len(lane_new) >= ADD_PER_RUN:
+                    break
+            new.extend(lane_new[:ADD_PER_RUN])
+            if lane_new:
+                sources.append("lanes: " + ", ".join(top))
+
     if not new:
-        log("no fresh clips found; skipping")
+        log("nothing to add (no requests, no positive lanes, or no fresh clips)")
         return
 
+    # 3) Write the new clips into the deck.
     today = datetime.date.today().isoformat()
+    note = "; ".join(sources) if sources else "auto"
     entries = []
     for vid, who, p, vibe in new:
         w = ", w:2" if vibe == "ideas" else ""
         entries.append(f'  {{id:"{vid}", who:"{who}", person:"{p}", vibe:"{vibe}"{w}}}')
-    insertion = (",\n  /* — auto-expanded " + today +
-                 " (top lanes: " + ", ".join(top) + ") — */\n" + ",\n".join(entries))
+    insertion = (",\n  /* — auto-expanded " + today + " (" + note + ") — */\n" + ",\n".join(entries))
 
     start = html.find("let VIDEOS = [")
     end = html.find("\n];", start)
     if start < 0 or end < 0:
         log("couldn't locate VIDEOS array; aborting (no change)")
         return
-    new_html = html[:end] + insertion + html[end:]
     with open(HTML, "w", encoding="utf-8") as f:
-        f.write(new_html)
-    log(f"added {len(new)} clips: " + " | ".join(w for _, w, _, _ in new))
+        f.write(html[:end] + insertion + html[end:])
+    log(f"added {len(new)} clips ({note})")
 
 
 if __name__ == "__main__":

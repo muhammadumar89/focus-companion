@@ -52,6 +52,7 @@ Both do exactly the same thing.
 - A clip **auto-plays muted** the moment it opens — **tap once** for sound.
 - **👍 / 👎** (or the **↑ / ↓** keys) teach it your taste.
 - **→ / space / n** skips to the next clip.
+- **Want more of someone?** Type a name in the box (e.g. *Lex Fridman*, *Dario Amodei*) — the nightly job fetches a batch of their clips and adds them to your deck.
 - Switch to **Quotes** mode anytime with the toggle.
 
 ## How it learns (the short version)

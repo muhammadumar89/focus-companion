@@ -1,6 +1,7 @@
-# personal data — your ratings & viewing history (stays on your machine)
+# personal data — your ratings, requests & viewing history (stays on your machine)
 taste.json
 ratings.jsonl
+requests.json
 
 # logs
 *.log

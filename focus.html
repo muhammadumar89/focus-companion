@@ -94,6 +94,15 @@
   #likeBtn.active{border-color:var(--accent);background:rgba(139,123,255,.20)}
   #dislikeBtn.active{border-color:var(--accent2);background:rgba(255,157,108,.20)}
   #nowPlaying{font-size:12.5px;color:var(--muted)}
+  .request-box{display:flex;gap:8px;max-width:520px;margin:0 auto 8px;width:100%}
+  #reqInput{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);color:var(--text);
+    font-family:inherit;font-size:13.5px;padding:10px 13px;border-radius:10px}
+  #reqInput:focus{outline:none;border-color:var(--accent)}
+  #reqInput::placeholder{color:var(--muted)}
+  #reqBtn{background:var(--accent);color:#0c0a1c;border:0;font-family:inherit;font-weight:700;font-size:13px;
+    padding:10px 14px;border-radius:10px;cursor:pointer;white-space:nowrap}
+  #reqBtn:hover{transform:translateY(-1px)}
+  #reqStatus{font-size:12px;color:var(--muted);max-width:520px;margin:0 auto 14px;min-height:15px;text-align:center}
 
   /* footer */
   footer{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-top:18px}
@@ -162,6 +171,11 @@
         <button id="nextClip">&#9197;&nbsp; Next clip</button>
         <span id="nowPlaying"></span>
       </div>
+      <div class="request-box">
+        <input id="reqInput" type="text" maxlength="80" placeholder="Want more of someone? e.g. Lex Fridman, Dario Amodei…" />
+        <button id="reqBtn">+ 20 clips tonight</button>
+      </div>
+      <div id="reqStatus"></div>
       <div class="watch-sub">
         A clip auto-plays each time the agent thinks. Tap once for sound, watch a bit, then come back.
         Hit &#128077;/&#128078; (or &uarr;/&darr;) to teach it what you like &mdash; it learns and shows you more of that.
@@ -386,7 +400,26 @@ let VIDEOS = [
   {id:"95xkeaFH0Cw", who:"Richard Feynman on Becoming a Scientist", person:"Richard Feynman", vibe:"ideas", w:2},
   {id:"izo-wCS1Hp0", who:"Richard Feynman — Cracking the Code of the Universe: Richard Feynm", person:"Richard Feynman", vibe:"ideas", w:2},
   {id:"ndP8MBaeaDQ", who:"Jeff Bezos — Amazon new launch | Dustbin with technology | Sm", person:"Jeff Bezos", vibe:"vision"},
-  {id:"fTwXS2H_iJo", who:"Jeff Bezos on Why It's Always Day 1 at Amazon", person:"Jeff Bezos", vibe:"vision"}
+  {id:"fTwXS2H_iJo", who:"Jeff Bezos on Why It's Always Day 1 at Amazon", person:"Jeff Bezos", vibe:"vision"},
+  /* — auto-expanded 2026-06-23 (top lanes: Steve Jobs, Jeff Bezos, Richard Feynman) — */
+  {id:"Hdr6yCnqT8E", who:"Richard Feynman about doubt and uncertainty", person:"Richard Feynman", vibe:"ideas", w:2},
+  /* — auto-expanded 2026-06-24 (top lanes: Steve Jobs, Jeff Bezos, Richard Feynman) — */
+  {id:"0pP3ZjMDzF4", who:"Steve Jobs — Make something wonderful and put it out there, S", person:"Steve Jobs", vibe:"vision"},
+  {id:"Bubd7lvD7jA", who:"Amazon billionaire Jeff Bezos", person:"Jeff Bezos", vibe:"vision"},
+  {id:"T7l6tFsK62Y", who:"Amazon billionaire Jeff Bezos", person:"Jeff Bezos", vibe:"vision"},
+  {id:"X1-Gz5Bv3W8", who:"Richard Feynman — Feynman- I was an ordinary person who studied ha", person:"Richard Feynman", vibe:"ideas", w:2},
+  /* — auto-expanded 2026-06-25 (top lanes: Steve Jobs, Jeff Bezos, Richard Feynman) — */
+  {id:"GLJCF7nAt8w", who:"You won’t regret watching this! Jeff Bezos Short", person:"Jeff Bezos", vibe:"vision"},
+  /* — auto-expanded 2026-06-26 (top lanes: Steve Jobs, Richard Feynman, Jeff Bezos) — */
+  {id:"rMMtLLK_mLE", who:"Steve Jobs was an asshole for yet another reason", person:"Steve Jobs", vibe:"vision"},
+  {id:"zITgl5z9pR0", who:"Richard Feynman on why awards carry no meaning f", person:"Richard Feynman", vibe:"ideas", w:2},
+  {id:"Fs3dqs_kFjA", who:"Jeff Bezos — The Only Regrets We Have is Not Doing Anything ,", person:"Jeff Bezos", vibe:"vision"},
+  /* — auto-expanded 2026-06-26 (requested 3× Lex Fridman; lanes: Steve Jobs, Richard Feynman, Jeff Bezos) — */
+  {id:"UbkB-vhjhHA", who:"Lex Fridman plays chess with Demis Hassabis", person:"Lex Fridman", vibe:"ideas", w:2},
+  {id:"Uu2q7ki5CmY", who:"Lex Fridman on Gaza, Israel, and Palestine", person:"Lex Fridman", vibe:"ideas", w:2},
+  {id:"PxSjXX5R6UA", who:"Lex Fridman on Why You Should Read Albert Camus’", person:"Lex Fridman", vibe:"ideas", w:2},
+  {id:"nONgw3LGn5g", who:"Steve Jobs — Break The Simulation", person:"Steve Jobs", vibe:"vision"},
+  {id:"0FE_EHfGadA", who:"STEVE JOBS MACBOOK AIR", person:"Steve Jobs", vibe:"vision"}
 ];
 
 /* ====================== STATE ====================== */
@@ -612,6 +645,27 @@ function unlockSound(){
 }
 function stopPlayer(){ const f=document.getElementById("ytframe"); if(f) f.remove(); }
 
+/* ---- request box: "fetch 20 clips of <name> overnight" ---- */
+function submitRequest(){
+  const el=$("reqInput"); const name=(el.value||"").trim();
+  if(!name) return;
+  try{ fetch("/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name, count:20})}); }catch(e){}
+  el.value="";
+  toast("Queued — 20 “"+name+"” clips arrive after tonight’s 3 AM run");
+  setTimeout(loadRequests, 400);
+}
+function loadRequests(){
+  fetch("/requests",{cache:"no-store"}).then(r=>r.json()).then(list=>{
+    const el=$("reqStatus"); if(!el||!Array.isArray(list)) return;
+    const pend=list.filter(x=>x.status==="pending").map(x=>x.name);
+    const done=list.filter(x=>x.status==="done").slice(-3).map(x=>x.name+" ("+(x.added||0)+")");
+    let s="";
+    if(pend.length) s+="⏳ queued for tonight: "+pend.join(", ");
+    if(done.length) s+=(s?"  ·  ":"")+"✓ added: "+done.join(", ");
+    el.textContent=s;
+  }).catch(()=>{});
+}
+
 /* ====================== MODE ====================== */
 function setMode(m){
   state.mode=m;
@@ -661,10 +715,14 @@ function init(){
   $("nextClip").onclick=loadRandomClip;
   $("likeBtn").onclick=()=>rate(1);
   $("dislikeBtn").onclick=()=>rate(-1);
+  $("reqBtn").onclick=submitRequest;
+  $("reqInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); submitRequest(); } });
+  loadRequests();
   $("backBtn").onclick=snapBack;
   $("resumeBtn").onclick=resumeFocus;
 
   document.addEventListener("keydown",e=>{
+    if(e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;   // don't hijack typing
     if(e.key==="Escape"){ snapBack(); return; }
     if(state.mode==="quote"){
       if(e.key===" "||e.key==="ArrowRight"){ e.preventDefault(); nextQuote(); }

@@ -31,6 +31,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"focus-bridge")
             return
+        if self.path.rstrip("/") == "/requests":
+            # let the page show what's queued / recently done
+            try:
+                data = open(os.path.join(DIR, "requests.json"), "rb").read()
+            except Exception:
+                data = b"[]"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(data)
+            return
         super().do_GET()
 
     def do_POST(self):
@@ -58,6 +69,32 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if isinstance(obj, dict):
                 with open(os.path.join(DIR, "taste.json"), "w") as f:
                     json.dump(obj, f, indent=2, ensure_ascii=False)
+            self.send_response(204)
+            self.end_headers()
+            return
+        if self.path.rstrip("/") == "/request":
+            # queue "fetch N clips of <name>" for the nightly job to fulfill
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length)
+            try:
+                req = json.loads(raw)
+            except Exception:
+                req = {}
+            name = (req.get("name") or "").strip()[:80]
+            if name:
+                rf = os.path.join(DIR, "requests.json")
+                try:
+                    reqs = json.load(open(rf))
+                except Exception:
+                    reqs = []
+                try:
+                    count = max(1, min(25, int(req.get("count", 20))))
+                except Exception:
+                    count = 20
+                reqs.append({"name": name, "count": count, "status": "pending",
+                             "at": datetime.datetime.now().isoformat(timespec="seconds")})
+                with open(rf, "w") as f:
+                    json.dump(reqs, f, indent=2, ensure_ascii=False)
             self.send_response(204)
             self.end_headers()
             return
