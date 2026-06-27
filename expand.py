@@ -23,6 +23,13 @@ SKIP_TITLE = re.compile(
     r"interview|mix|playlist|live|parody|remix|song|\brap\b|lyrics|cover|tribute|"
     r"ai ?voice|deepfake|reaction|meme|funny|prank|magic|gangsta|edit\b)\b", re.I)
 
+# Channels always pulled in — brand / vision content. EVERY short on these channels
+# is added (and kept fresh nightly), so it travels with every copy of the app.
+PINNED = [
+    {"person": "CodeNinja Spaces", "vibe": "codeninja",
+     "url": "https://www.youtube.com/@codeninjaspaces/shorts"},
+]
+
 
 def log(m):
     line = f"[{datetime.datetime.now().isoformat(timespec='seconds')}] {m}"
@@ -59,6 +66,22 @@ def search_shorts(ytdlp, person, n=SEARCH_N, max_dur=90):
     return out_rows
 
 
+def list_channel(ytdlp, url):
+    # every short on a channel (fast, flat). Their own content -> no junk filter.
+    try:
+        out = subprocess.run([ytdlp, "--flat-playlist", "--print", "%(id)s\t%(title)s", url],
+                             capture_output=True, text=True, timeout=180).stdout
+    except Exception as e:
+        log(f"  channel fetch failed {url}: {e}")
+        return []
+    rows = []
+    for line in out.splitlines():
+        if "\t" in line:
+            vid, title = line.split("\t", 1)
+            rows.append((vid.strip(), title.strip()))
+    return rows
+
+
 def clean_who(person, title):
     t = re.sub(r"#\w+", " ", title)
     t = re.sub(r'["\\\n\r]', " ", t)               # kill anything that breaks a JS string
@@ -80,6 +103,19 @@ def main():
 
     new = []          # (vid, who, person, vibe)
     sources = []      # human note of what we grew
+
+    # 0) Pinned channels — always add every fresh short (CodeNinja vision travels along).
+    for ch in PINNED:
+        got = 0
+        for vid, title in list_channel(ytdlp, ch["url"]):
+            if vid in ids:
+                continue
+            ids.add(vid)
+            new.append((vid, clean_who(ch["person"], title), ch["person"], ch["vibe"]))
+            got += 1
+        if got:
+            sources.append(f"{ch['person']} +{got}")
+            log(f"pinned {ch['person']}: +{got}")
 
     # 1) Fulfill any requests typed into the focus page (uncapped per request).
     reqf = os.path.join(DIR, "requests.json")
