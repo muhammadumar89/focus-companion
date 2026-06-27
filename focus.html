@@ -103,6 +103,19 @@
     padding:10px 14px;border-radius:10px;cursor:pointer;white-space:nowrap}
   #reqBtn:hover{transform:translateY(-1px)}
   #reqStatus{font-size:12px;color:var(--muted);max-width:520px;margin:0 auto 14px;min-height:15px;text-align:center}
+  .post-btn{display:block;width:100%;max-width:520px;margin:0 auto 8px;background:transparent;
+    border:1px dashed var(--line);color:var(--muted);font-family:inherit;font-size:13px;
+    padding:9px 12px;border-radius:10px;cursor:pointer;transition:all .14s ease}
+  .post-btn:hover{border-color:var(--accent);color:var(--text)}
+  #postPanel{max-width:520px;margin:0 auto 10px;text-align:left}
+  #postText{width:100%;min-height:78px;resize:vertical;background:var(--card);border:1px solid var(--accent);
+    color:var(--text);font-family:inherit;font-size:13.5px;line-height:1.5;padding:11px 13px;border-radius:10px}
+  #postText:focus{outline:none}
+  .post-actions{display:flex;align-items:center;gap:10px;margin-top:7px}
+  #copyBtn{background:var(--accent);color:#0c0a1c;border:0;font-family:inherit;font-weight:700;font-size:13px;
+    padding:8px 16px;border-radius:9px;cursor:pointer}
+  #copyBtn:hover{transform:translateY(-1px)}
+  #copyHint{font-size:12px;color:var(--accent)}
 
   /* footer */
   footer{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-top:18px}
@@ -170,6 +183,14 @@
         <button id="dislikeBtn" class="rate-btn" title="Less like this (↓)">&#128078;</button>
         <button id="nextClip">&#9197;&nbsp; Next clip</button>
         <span id="nowPlaying"></span>
+      </div>
+      <button id="postBtn" class="post-btn">📝 Create a LinkedIn post from this clip</button>
+      <div id="postPanel" class="hidden">
+        <textarea id="postText" spellcheck="false"></textarea>
+        <div class="post-actions">
+          <button id="copyBtn">Copy</button>
+          <span id="copyHint"></span>
+        </div>
       </div>
       <div class="request-box">
         <input id="reqInput" type="text" maxlength="80" placeholder="Want more of someone? e.g. Lex Fridman, Dario Amodei…" />
@@ -731,6 +752,7 @@ function loadRandomClip(){
   markSeen(v);
   embed(v, !soundUnlocked);
   const ov=$("soundOverlay"); if(ov) ov.style.display = soundUnlocked ? "none" : "flex";
+  const pp=$("postPanel"); if(pp) pp.classList.add("hidden");   // fresh clip → hide old post
   updateRateButtons();
 }
 function unlockSound(){
@@ -759,6 +781,40 @@ function loadRequests(){
     if(done.length) s+=(s?"  ·  ":"")+"✓ added: "+done.join(", ");
     el.textContent=s;
   }).catch(()=>{});
+}
+
+/* ---- turn the current clip into a short, paste-ready post (no auto-posting) ---- */
+const POST_TAGS = {
+  codeninja:"#SovereignAI #AI #FutureOfWork #CodeNinja",
+  ideas:"#FirstPrinciples #Curiosity #DeepWork",
+  vision:"#Leadership #Vision #Innovation",
+  grit:"#Discipline #Mindset #NoExcuses",
+  drive:"#BuildInPublic #Founders #Mindset",
+  wisdom:"#Wisdom #Clarity #Mindset"
+};
+const POST_EMOJI = {codeninja:"🚀", ideas:"💡", vision:"🚀", grit:"🔥", drive:"⚡", wisdom:"🧭"};
+function themeOf(v){
+  let t = v.who || "";
+  const i = t.indexOf(" — ");
+  if(i >= 0) t = t.slice(i + 3);                 // drop the "Person — " prefix
+  return t.replace(/\s+/g," ").replace(/[\s,;:.\-–]+$/,"").trim();
+}
+function makePost(){
+  if(!currentVid) return;
+  const v = currentVid;
+  const emoji = POST_EMOJI[v.vibe] || "💡";
+  const tags  = POST_TAGS[v.vibe] || "#Ideas #Mindset";
+  $("postText").value = emoji + " " + themeOf(v) + "\n\n" + tags;
+  $("postPanel").classList.remove("hidden");
+  const ta = $("postText"); ta.focus(); ta.select();
+  $("copyHint").textContent = "";
+}
+function copyPost(){
+  const ta = $("postText"); ta.select();
+  const done = () => { $("copyHint").textContent = "copied ✓ — paste into LinkedIn"; };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(ta.value).then(done).catch(()=>{ try{document.execCommand("copy");}catch(e){} done(); });
+  } else { try{document.execCommand("copy");}catch(e){} done(); }
 }
 
 /* ====================== MODE ====================== */
@@ -813,6 +869,8 @@ function init(){
   $("reqBtn").onclick=submitRequest;
   $("reqInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); submitRequest(); } });
   loadRequests();
+  $("postBtn").onclick=makePost;
+  $("copyBtn").onclick=copyPost;
   $("backBtn").onclick=snapBack;
   $("resumeBtn").onclick=resumeFocus;
 
