@@ -709,31 +709,25 @@ function loadRequests(){
   }).catch(()=>{});
 }
 
-/* ---- turn the current clip into a short, paste-ready post (no auto-posting) ---- */
-const POST_TAGS = {
-  codeninja:"#SovereignAI #AI #FutureOfWork #CodeNinja",
-  ideas:"#FirstPrinciples #Curiosity #DeepWork",
-  vision:"#Leadership #Vision #Innovation",
-  grit:"#Discipline #Mindset #NoExcuses",
-  drive:"#BuildInPublic #Founders #Mindset",
-  wisdom:"#Wisdom #Clarity #Mindset"
-};
-const POST_EMOJI = {codeninja:"🚀", ideas:"💡", vision:"🚀", grit:"🔥", drive:"⚡", wisdom:"🧭"};
-function themeOf(v){
-  let t = v.who || "";
-  const i = t.indexOf(" — ");
-  if(i >= 0) t = t.slice(i + 3);                 // drop the "Person — " prefix
-  return t.replace(/\s+/g," ").replace(/[\s,;:.\-–]+$/,"").trim();
-}
+/* ---- turn the current clip into a real, paste-ready LinkedIn post ----
+   asks the local bridge to read the clip's transcript and have Claude write it. */
+let postBusy = false;
 function makePost(){
-  if(!currentVid) return;
+  if(!currentVid || postBusy) return;
   const v = currentVid;
-  const emoji = POST_EMOJI[v.vibe] || "💡";
-  const tags  = POST_TAGS[v.vibe] || "#Ideas #Mindset";
-  $("postText").value = emoji + " " + themeOf(v) + "\n\n" + tags;
   $("postPanel").classList.remove("hidden");
-  const ta = $("postText"); ta.focus(); ta.select();
+  $("postText").value = "Reading the clip and writing your post… (a few seconds)";
   $("copyHint").textContent = "";
+  postBusy = true;
+  fetch("/post?id="+encodeURIComponent(v.id)+"&title="+encodeURIComponent(v.who||""), {cache:"no-store"})
+    .then(r=>r.json())
+    .then(d=>{
+      if(d && d.post){ $("postText").value = d.post; }
+      else { $("postText").value = "Couldn't generate a post"+(d&&d.error?" — "+d.error:"")+".\nTry another clip, or check your API key."; }
+      $("postText").focus();
+    })
+    .catch(()=>{ $("postText").value = "Couldn't reach the post generator — make sure the focus server is running."; })
+    .finally(()=>{ postBusy = false; });
 }
 function copyPost(){
   const ta = $("postText"); ta.select();

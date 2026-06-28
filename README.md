@@ -24,6 +24,7 @@ And it **learns**. You give each clip a 👍 or 👎, and it shows you more of w
 - **[Claude Code](https://claude.com/claude-code)** — the auto-open-while-thinking magic is a Claude Code *hook*
 - **Python 3** (already on every Mac)
 - *(optional)* **yt-dlp** — only needed for the nightly auto-grow; the installer offers to set it up
+- *(optional)* an **Anthropic API key** — only for the "Create a LinkedIn post" button (it reads the clip's transcript and drafts a real post). Set `ANTHROPIC_API_KEY` in your environment, or add it to `~/focus-companion/.env`. Without it, every other feature still works.
 
 > No Claude Code? It still works — just open `http://localhost:7654/focus.html` yourself after starting the server. You only lose the auto-open-on-thinking.
 
