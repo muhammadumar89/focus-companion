@@ -832,7 +832,7 @@ function resumeFocus(){ $("snapback").classList.add("hidden"); startSession(); }
    POST_BACKEND = your Render API URL — set it to turn the LinkedIn-post button ON
    for the hosted team page (leave "" to keep it hidden when hosted). */
 const HOSTED = !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-const POST_BACKEND = "";   // e.g. "https://focus-companion-api.onrender.com"
+const POST_BACKEND = "https://focus-companion-api.onrender.com";   // Render API for LinkedIn posts
 
 function init(){
   buildPeople();
