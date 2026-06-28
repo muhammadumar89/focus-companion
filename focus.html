@@ -116,6 +116,9 @@
     padding:8px 16px;border-radius:9px;cursor:pointer}
   #copyBtn:hover{transform:translateY(-1px)}
   #copyHint{font-size:12px;color:var(--accent)}
+  #statsPanel{max-width:520px;margin:0 auto 12px;text-align:left;background:var(--card);
+    border:1px solid var(--line);border-radius:11px;padding:13px 15px;font-size:13px;color:var(--text);line-height:1.65}
+  #statsPanel b{color:var(--accent);font-weight:700}
 
   /* footer */
   footer{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-top:18px}
@@ -192,6 +195,8 @@
           <span id="copyHint"></span>
         </div>
       </div>
+      <button id="statsBtn" class="post-btn">📊 What I've watched most</button>
+      <div id="statsPanel" class="hidden"><div id="statsBody"></div></div>
       <div class="request-box">
         <input id="reqInput" type="text" maxlength="80" placeholder="Want more of someone? e.g. Lex Fridman, Dario Amodei…" />
         <button id="reqBtn">+ 20 clips tonight</button>
@@ -589,6 +594,27 @@ function syncTaste(){
 }
 function tasteFor(id){ return TASTE[id] || (TASTE[id]={up:0,down:0,seen:0,last:0}); }
 
+/* ---- watch-time: how many seconds each clip was actually on screen ---- */
+let watchVid=null, watchStart=0;
+function accrueWatch(){
+  if(document.hidden) return;                       // don't count while the tab is hidden
+  if(watchVid && watchStart){
+    const t=tasteFor(watchVid.id);
+    t.watch=(t.watch||0)+Math.min(600,Math.max(0,(Date.now()-watchStart)/1000));  // cap guards sleep
+    saveTaste();
+  }
+  watchStart=Date.now();
+}
+function startWatch(v){ accrueWatch(); watchVid=v; watchStart=Date.now(); }
+function pauseWatch(){
+  if(watchVid && watchStart){
+    const t=tasteFor(watchVid.id);
+    t.watch=(t.watch||0)+Math.min(600,Math.max(0,(Date.now()-watchStart)/1000));
+    saveTaste();
+  }
+  watchStart=0;
+}
+
 const RECENT = [];                                   // recently-shown indices (anti-repeat)
 function avoidWindow(){ return Math.min(6, Math.max(1, Math.floor(VIDEOS.length/3))); }
 
@@ -679,6 +705,8 @@ function loadRandomClip(){
   embed(v, !soundUnlocked);
   const ov=$("soundOverlay"); if(ov) ov.style.display = soundUnlocked ? "none" : "flex";
   const pp=$("postPanel"); if(pp) pp.classList.add("hidden");   // fresh clip → hide old post
+  const sp=$("statsPanel"); if(sp) sp.classList.add("hidden");
+  startWatch(v);                                                // begin timing this clip
   updateRateButtons();
 }
 function unlockSound(){
@@ -737,6 +765,30 @@ function copyPost(){
   } else { try{document.execCommand("copy");}catch(e){} done(); }
 }
 
+/* ---- "what have I watched most" — built from per-clip watch seconds ---- */
+function esc(s){ return (s+"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function fmtMin(sec){ const m=Math.floor(sec/60), s=Math.round(sec%60); return m? m+"m "+s+"s" : s+"s"; }
+function showStats(){
+  accrueWatch();                                   // include the clip you're on right now
+  let total=0; const person={}, clips=[];
+  for(const id in TASTE){
+    const w=(TASTE[id].watch)||0; if(w<1) continue;
+    total+=w;
+    const v=VIDEOS.find(x=>x.id===id);
+    const who=v?v.who:("(removed clip)"), p=v?(v.person||"other"):"other";
+    person[p]=(person[p]||0)+w;
+    clips.push([who,w]);
+  }
+  const topP=Object.entries(person).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const topC=clips.sort((a,b)=>b[1]-a[1]).slice(0,6);
+  let h="<b>You've watched "+fmtMin(total)+"</b> across "+clips.length+" clip"+(clips.length===1?"":"s")+".";
+  if(topP.length) h+="<br><br><b>Most-watched voices</b><br>"+topP.map(([k,v])=>"&bull; "+esc(k)+" — "+fmtMin(v)).join("<br>");
+  if(topC.length) h+="<br><br><b>Top clips</b><br>"+topC.map(([k,v])=>"&bull; "+esc(k)+" — "+fmtMin(v)).join("<br>");
+  if(!clips.length) h="No watch time yet — watch a few clips and check back.";
+  $("statsBody").innerHTML=h;
+  $("statsPanel").classList.toggle("hidden");
+}
+
 /* ====================== MODE ====================== */
 function setMode(m){
   state.mode=m;
@@ -791,6 +843,7 @@ function init(){
   loadRequests();
   $("postBtn").onclick=makePost;
   $("copyBtn").onclick=copyPost;
+  $("statsBtn").onclick=showStats;
   $("backBtn").onclick=snapBack;
   $("resumeBtn").onclick=resumeFocus;
 
@@ -809,10 +862,12 @@ function init(){
   /* each time the window is shown again, treat it as a fresh thinking wait —
      and roll a new clip so a reused tab still auto-plays something new */
   document.addEventListener("visibilitychange",()=>{
-    if(document.hidden){ endSession(); }
+    if(document.hidden){ pauseWatch(); endSession(); }
     else { $("timer").textContent="0:00"; startSession(); if(state.mode==="watch"){ soundUnlocked=false; loadRandomClip(); } }
   });
   window.addEventListener("focus",()=>{ if(!state.started){ $("timer").textContent="0:00"; startSession(); } });
+  setInterval(accrueWatch, 15000);                                  // bank watch-time periodically
+  window.addEventListener("beforeunload",()=>{ pauseWatch(); syncTaste(); });
 
   $("timer").textContent="0:00";
   startSession();
