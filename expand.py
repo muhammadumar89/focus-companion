@@ -23,12 +23,9 @@ SKIP_TITLE = re.compile(
     r"interview|mix|playlist|live|parody|remix|song|\brap\b|lyrics|cover|tribute|"
     r"ai ?voice|deepfake|reaction|meme|funny|prank|magic|gangsta|edit\b)\b", re.I)
 
-# Channels always pulled in — brand / vision content. EVERY short on these channels
-# is added (and kept fresh nightly), so it travels with every copy of the app.
-PINNED = [
-    {"person": "CodeNinja Spaces", "vibe": "codeninja",
-     "url": "https://www.youtube.com/@codeninjaspaces/shorts"},
-]
+# Channels always pulled in — every short on these is added & kept fresh nightly.
+# Empty for now. Add {"person":..., "vibe":..., "url":...} dicts to pin a channel.
+PINNED = []
 
 
 def log(m):
