@@ -827,10 +827,18 @@ function resumeFocus(){ $("snapback").classList.add("hidden"); startSession(); }
 
 /* ====================== INIT ====================== */
 function init(){
+  /* HOSTED = served from a real domain (no local bridge). Hide the features that
+     need the bridge; watching, rating and watch-stats all still work. */
+  const HOSTED = !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   buildPeople();
   setMode("watch");
   renderStats();
-  syncTaste();          // push existing browser memory to the bridge on every open
+  if(!HOSTED) syncTaste();          // push browser memory to the bridge (local only)
+  if(HOSTED){
+    ["postBtn","postPanel","reqStatus"].forEach(id=>{ const e=$(id); if(e) e.classList.add("hidden"); });
+    const rb=document.querySelector(".request-box"); if(rb) rb.classList.add("hidden");
+    const tl=document.querySelector(".timer-label"); if(tl) tl.textContent="focus break";
+  }
 
   document.querySelectorAll(".mode").forEach(b=>{ b.onclick=()=>setMode(b.dataset.mode); });
   $("actionBtn").onclick=()=>{ if(state.mode==="quote") nextQuote(); };
@@ -840,7 +848,7 @@ function init(){
   $("dislikeBtn").onclick=()=>rate(-1);
   $("reqBtn").onclick=submitRequest;
   $("reqInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); submitRequest(); } });
-  loadRequests();
+  if(!HOSTED) loadRequests();
   $("postBtn").onclick=makePost;
   $("copyBtn").onclick=copyPost;
   $("statsBtn").onclick=showStats;
