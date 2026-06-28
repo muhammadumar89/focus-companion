@@ -6,6 +6,9 @@ requests.json
 # logs
 *.log
 
+# local-only nightly wrapper (does the git push; not part of the shared product)
+nightly.sh
+
 # backups, caches, OS cruft
 *.bak
 __pycache__/
