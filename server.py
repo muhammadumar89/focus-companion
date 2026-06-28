@@ -13,9 +13,11 @@ import http.server, socketserver, json, os, datetime, glob, shutil, tempfile, re
 import urllib.request, urllib.parse, urllib.error
 
 DIR = os.path.dirname(os.path.abspath(__file__))   # this script's own folder
-PORT = 7654
+PORT = int(os.environ.get("PORT", "7654"))            # Render injects $PORT
+HOST = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
 RATINGS = os.path.join(DIR, "ratings.jsonl")
 POST_MODEL = "claude-sonnet-4-6"
+CORS_ORIGIN = "https://muhammadumar89.github.io"       # the hosted team page allowed to call this
 
 
 def _ytdlp():
@@ -110,7 +112,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     # always-fresh: kill caching so edits show up on a plain reload
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, max-age=0")
+        self.send_header("Access-Control-Allow-Origin", CORS_ORIGIN)
         super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.end_headers()
 
     def do_GET(self):
         if self.path.rstrip("/") == "/__ping":
@@ -205,5 +213,5 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     http.server.ThreadingHTTPServer.allow_reuse_address = True
-    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    httpd = http.server.ThreadingHTTPServer((HOST, PORT), Handler)
     httpd.serve_forever()

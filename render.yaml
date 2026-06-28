@@ -1,0 +1,13 @@
+# Render Blueprint — deploys the Focus Companion post-writer API.
+# In Render: New → Blueprint → connect this repo. It reads this file, then asks
+# you to paste ANTHROPIC_API_KEY (kept as a secret; never in the code).
+services:
+  - type: web
+    name: focus-companion-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false      # you paste this in the Render dashboard (secret)

@@ -747,7 +747,8 @@ function makePost(){
   $("postText").value = "Reading the clip and writing your post… (a few seconds)";
   $("copyHint").textContent = "";
   postBusy = true;
-  fetch("/post?id="+encodeURIComponent(v.id)+"&title="+encodeURIComponent(v.who||""), {cache:"no-store"})
+  const base = HOSTED ? POST_BACKEND : "";
+  fetch(base+"/post?id="+encodeURIComponent(v.id)+"&title="+encodeURIComponent(v.who||""), {cache:"no-store"})
     .then(r=>r.json())
     .then(d=>{
       if(d && d.post){ $("postText").value = d.post; }
@@ -826,16 +827,21 @@ function snapBack(){
 function resumeFocus(){ $("snapback").classList.add("hidden"); startSession(); }
 
 /* ====================== INIT ====================== */
+/* ===== hosted config =====
+   HOSTED = served from a real domain (no local bridge).
+   POST_BACKEND = your Render API URL — set it to turn the LinkedIn-post button ON
+   for the hosted team page (leave "" to keep it hidden when hosted). */
+const HOSTED = !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+const POST_BACKEND = "";   // e.g. "https://focus-companion-api.onrender.com"
+
 function init(){
-  /* HOSTED = served from a real domain (no local bridge). Hide the features that
-     need the bridge; watching, rating and watch-stats all still work. */
-  const HOSTED = !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   buildPeople();
   setMode("watch");
   renderStats();
   if(!HOSTED) syncTaste();          // push browser memory to the bridge (local only)
   if(HOSTED){
-    ["postBtn","postPanel","reqStatus"].forEach(id=>{ const e=$(id); if(e) e.classList.add("hidden"); });
+    if(!POST_BACKEND){ ["postBtn","postPanel"].forEach(id=>{ const e=$(id); if(e) e.classList.add("hidden"); }); }
+    const rs=$("reqStatus"); if(rs) rs.classList.add("hidden");
     const rb=document.querySelector(".request-box"); if(rb) rb.classList.add("hidden");
     const tl=document.querySelector(".timer-label"); if(tl) tl.textContent="focus break";
   }
