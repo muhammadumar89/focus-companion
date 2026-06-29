@@ -92,6 +92,7 @@
     padding:8px 13px;border-radius:10px;cursor:pointer;font-family:inherit;transition:all .14s ease}
   .rate-btn:hover{border-color:var(--accent);transform:translateY(-1px)}
   #likeBtn.active{border-color:var(--accent);background:rgba(139,123,255,.20)}
+  #superBtn.active{border-color:#ffd24a;background:rgba(255,210,74,.20)}
   #dislikeBtn.active{border-color:var(--accent2);background:rgba(255,157,108,.20)}
   #nowPlaying{font-size:12.5px;color:var(--muted)}
   .request-box{display:flex;gap:8px;max-width:520px;margin:0 auto 8px;width:100%}
@@ -183,6 +184,7 @@
       </div>
       <div class="player-ctrls">
         <button id="likeBtn" class="rate-btn" title="More like this (↑)">&#128077;</button>
+        <button id="superBtn" class="rate-btn" title="Super like — show me this a lot more (s)">&#11088;</button>
         <button id="dislikeBtn" class="rate-btn" title="Less like this (↓)">&#128078;</button>
         <button id="nextClip">&#9197;&nbsp; Next clip</button>
         <span id="nowPlaying"></span>
@@ -616,7 +618,7 @@ function laneStats(){
   const person={}, vibe={};
   VIDEOS.forEach(v=>{
     const t=TASTE[v.id]; if(!t) return;
-    const net=(t.up||0)-(t.down||0);
+    const net=(t.up||0)-(t.down||0)+2*(t.super||0);
     if(v.person) person[v.person]=(person[v.person]||0)+net;
     if(v.vibe)   vibe[v.vibe]   =(vibe[v.vibe]  ||0)+net;
   });
@@ -625,18 +627,20 @@ function laneStats(){
 
 function clipWeight(i, lanes){
   const v=VIDEOS[i], t=tasteFor(v.id);
-  const base=v.w||1;
+  const base=v.w||1, sup=t.super||0;
   const net=(t.up||0)-(t.down||0);
   let taste;
   if(net<=-2) taste=0.03;                            // two net dislikes ≈ hidden
   else taste=Math.min(6, Math.max(0.2, Math.pow(1.9, net)));
+  const superMult = sup>0 ? Math.min(60, 20*sup) : 1; // ⭐ super-like → comes up a LOT more
   /* lane lift: how much the REST of this clip's lanes are liked (exclude self) */
-  const pNet=(v.person ? (lanes.person[v.person]||0) : 0) - net;
-  const vNet=(v.vibe   ? (lanes.vibe[v.vibe]    ||0) : 0) - net;
+  const self=net+2*sup;
+  const pNet=(v.person ? (lanes.person[v.person]||0) : 0) - self;
+  const vNet=(v.vibe   ? (lanes.vibe[v.vibe]    ||0) : 0) - self;
   const lane=Math.min(3, Math.max(0.4, Math.pow(1.25,pNet)*Math.pow(1.12,vNet)));
-  const variety=1/(1+0.15*(t.seen||0));              // gently favor less-seen
+  const variety=sup>0 ? 1 : 1/(1+0.15*(t.seen||0)); // super-likes don't fade with repeats
   const fresh=(t.seen||0)===0 ? 1.5 : 1;             // surface never-seen clips first
-  return base*taste*lane*variety*fresh;
+  return base*taste*superMult*lane*variety*fresh;
 }
 
 function disliked(i){ const t=TASTE[VIDEOS[i].id]; return t && ((t.up||0)-(t.down||0))<=-1; }  // 👎 = out
@@ -672,11 +676,20 @@ function rate(dir){
   saveTaste(); postRate(v, dir); syncTaste(); updateRateButtons();
   if(dir<0) loadRandomClip();                        // skip away from a disliked clip
 }
+function superLike(){
+  if(!currentVid) return;
+  const v=currentVid, t=tasteFor(v.id);
+  t.super=(t.super||0)+1;
+  saveTaste(); postRate(v, 2); syncTaste(); updateRateButtons();
+  toast("⭐ Super-liked — you'll see this a lot more");
+}
 function updateRateButtons(){
   const t=currentVid ? (TASTE[currentVid.id]||{}) : {};
-  const up=t.up||0, down=t.down||0, lb=$("likeBtn"), db=$("dislikeBtn");
-  if(lb) lb.classList.toggle("active", up>down);
+  const up=t.up||0, down=t.down||0, sup=t.super||0;
+  const lb=$("likeBtn"), db=$("dislikeBtn"), sb=$("superBtn");
+  if(lb) lb.classList.toggle("active", up>down && !sup);
   if(db) db.classList.toggle("active", down>up);
+  if(sb) sb.classList.toggle("active", sup>0);
 }
 function showNowPlaying(v){ const el=$("nowPlaying"); if(el) el.textContent="▶ "+v.who; }
 
@@ -845,6 +858,7 @@ function init(){
   $("soundOverlay").onclick=unlockSound;
   $("nextClip").onclick=loadRandomClip;
   $("likeBtn").onclick=()=>rate(1);
+  $("superBtn").onclick=superLike;
   $("dislikeBtn").onclick=()=>rate(-1);
   $("reqBtn").onclick=submitRequest;
   $("reqInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); submitRequest(); } });
@@ -862,6 +876,7 @@ function init(){
       if(e.key===" "||e.key==="ArrowRight"){ e.preventDefault(); nextQuote(); }
     } else {  /* watch mode: ↑ like, ↓ dislike, → / space / n next */
       if(e.key==="ArrowUp"){ e.preventDefault(); rate(1); }
+      else if(e.key==="s"||e.key==="S"){ e.preventDefault(); superLike(); }
       else if(e.key==="ArrowDown"){ e.preventDefault(); rate(-1); }
       else if(e.key==="ArrowRight"||e.key===" "||e.key==="n"){ e.preventDefault(); loadRandomClip(); }
     }

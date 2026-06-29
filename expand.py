@@ -174,7 +174,7 @@ def main():
         for cid, t in taste.items():
             p = clip_person.get(cid, "")
             if p:
-                net[p] = net.get(p, 0) + (t.get("up", 0) - t.get("down", 0))
+                net[p] = net.get(p, 0) + (t.get("up", 0) - t.get("down", 0) + 2 * t.get("super", 0))
         top = [p for p, n in sorted(net.items(), key=lambda x: -x[1]) if n > 0][:3]
         if top:
             log(f"top lanes: {[(p, net[p]) for p in top]}")
