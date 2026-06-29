@@ -110,6 +110,8 @@ def main():
     taste = json.load(open(TASTE)) if os.path.isfile(TASTE) else {}
     html = open(HTML, encoding="utf-8").read()
     ids = set(re.findall(r'\{id:"([^"]+)"', html))
+    drop = {cid for cid, t in taste.items() if (t.get("up", 0) - t.get("down", 0)) <= -1}  # 👎'd
+    ids |= drop                      # never re-add a clip you've disliked
     ytdlp = find_ytdlp()
 
     new = []          # (vid, who, person, vibe)
@@ -193,27 +195,30 @@ def main():
             if lane_new:
                 sources.append("lanes: " + ", ".join(top))
 
-    if not new:
-        log("nothing to add (no requests, no positive lanes, or no fresh clips)")
-        return
-
-    # 3) Write the new clips into the deck.
-    today = datetime.date.today().isoformat()
-    note = "; ".join(sources) if sources else "auto"
-    entries = []
-    for vid, who, p, vibe in new:
-        w = ", w:2" if vibe == "ideas" else ""
-        entries.append(f'  {{id:"{vid}", who:"{who}", person:"{p}", vibe:"{vibe}"{w}}}')
-    insertion = (",\n  /* — auto-expanded " + today + " (" + note + ") — */\n" + ",\n".join(entries))
-
+    # 3) Rebuild the VIDEOS array: drop disliked clips, keep the rest, append new ones.
     start = html.find("let VIDEOS = [")
+    obr = html.find("[", start)
     end = html.find("\n];", start)
-    if start < 0 or end < 0:
+    if obr < 0 or end < 0:
         log("couldn't locate VIDEOS array; aborting (no change)")
         return
+    kept, pruned = [], 0
+    for m in re.finditer(r'\{id:"([^"]+)"[^}]*\}', html[obr + 1:end]):
+        if m.group(1) in drop:
+            pruned += 1
+        else:
+            kept.append(m.group(0))
+    for vid, who, p, vibe in new:
+        w = ", w:2" if vibe == "ideas" else ""
+        kept.append(f'{{id:"{vid}", who:"{who}", person:"{p}", vibe:"{vibe}"{w}}}')
+    if not new and not pruned:
+        log("nothing to add or prune")
+        return
+    body = "\n  " + ",\n  ".join(kept)
     with open(HTML, "w", encoding="utf-8") as f:
-        f.write(html[:end] + insertion + html[end:])
-    log(f"added {len(new)} clips ({note})")
+        f.write(html[:obr + 1] + body + html[end:])
+    note = "; ".join(sources) if sources else "auto"
+    log(f"deck rebuilt: +{len(new)} added, -{pruned} disliked  (now {len(kept)}) ({note})")
 
 
 if __name__ == "__main__":
