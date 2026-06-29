@@ -663,11 +663,13 @@ function clipWeight(i, lanes){
   return base*taste*lane*variety*fresh;
 }
 
+function disliked(i){ const t=TASTE[VIDEOS[i].id]; return t && ((t.up||0)-(t.down||0))<=-1; }  // 👎 = out
 function pickVid(){
   const lanes=laneStats();
   const win=avoidWindow(), recent=new Set(RECENT.slice(-win));
-  let cands=VIDEOS.map((v,i)=>i).filter(i=>!recent.has(i));
-  if(!cands.length) cands=VIDEOS.map((v,i)=>i);
+  let cands=VIDEOS.map((v,i)=>i).filter(i=>!disliked(i) && !recent.has(i));
+  if(!cands.length) cands=VIDEOS.map((v,i)=>i).filter(i=>!disliked(i));  // drop the no-repeat window
+  if(!cands.length) cands=VIDEOS.map((v,i)=>i);                          // everything disliked → show anyway
   const weighted=cands.map(i=>({i, w:clipWeight(i, lanes)}));
   const total=weighted.reduce((s,c)=>s+c.w,0);
   let r=Math.random()*total, idx=weighted[weighted.length-1].i;
