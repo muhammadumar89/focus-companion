@@ -89,6 +89,20 @@ def clean_who(person, title):
     return t if person.lower() in t.lower() else f"{person} — {t}"
 
 
+_FILLER = re.compile(r"\b(at ?least|atleast|please|some|a ?few|the|of|for|me|i|want|wanna|add|show|find|"
+                     r"get|give|with|to|and|on|about|shorts?|videos?|clips?|reels?)\b", re.I)
+def clean_request_name(raw):
+    """Turn a typed request into a clean search name: 'David Dutch, atleast 20
+    shorts of David Dutch' -> 'David Dutch'. Drops commas-tail, numbers, filler."""
+    s = (raw or "").split(",")[0]
+    s = re.sub(r"\d+", " ", s)
+    s = _FILLER.sub(" ", s)
+    s = re.sub(r"[^A-Za-z .&\-']", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    s = " ".join(s.split()[:4])               # cap to ~4 words
+    return s or (raw or "").strip()[:40]
+
+
 def main():
     if not os.path.isfile(HTML):
         log("missing focus.html; skipping")
@@ -125,7 +139,7 @@ def main():
     for r in reqs:
         if r.get("status") != "pending":
             continue
-        name = (r.get("name") or "").strip()
+        name = clean_request_name(r.get("name") or "")
         if not name:
             r["status"] = "skipped"; reqs_changed = True; continue
         want = max(1, min(25, int(r.get("count", 20))))

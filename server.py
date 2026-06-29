@@ -105,6 +105,18 @@ def _write_post(vid, title):
         return {"error": str(e)[:200]}
 
 
+_FILLER = re.compile(r"\b(at ?least|atleast|please|some|a ?few|the|of|for|me|i|want|wanna|add|show|find|"
+                     r"get|give|with|to|and|on|about|shorts?|videos?|clips?|reels?)\b", re.I)
+def clean_request_name(raw):
+    s = (raw or "").split(",")[0]
+    s = re.sub(r"\d+", " ", s)
+    s = _FILLER.sub(" ", s)
+    s = re.sub(r"[^A-Za-z .&\-']", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    s = " ".join(s.split()[:4])
+    return s or (raw or "").strip()[:40]
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *a, **k):
         super().__init__(*a, directory=DIR, **k)
@@ -186,7 +198,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 req = json.loads(raw)
             except Exception:
                 req = {}
-            name = (req.get("name") or "").strip()[:80]
+            name = clean_request_name(req.get("name") or "")
             if name:
                 rf = os.path.join(DIR, "requests.json")
                 try:
