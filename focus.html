@@ -104,6 +104,14 @@
     padding:10px 14px;border-radius:10px;cursor:pointer;white-space:nowrap}
   #reqBtn:hover{transform:translateY(-1px)}
   #reqStatus{font-size:12px;color:var(--muted);max-width:520px;margin:0 auto 14px;min-height:15px;text-align:center}
+  .dial-box{max-width:520px;margin:0 auto 12px;width:100%}
+  .dial-labels{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:600}
+  #dial{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:6px;outline:none;cursor:pointer;
+    background:linear-gradient(90deg,var(--accent2),var(--accent))}
+  #dial::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;
+    border:2px solid var(--accent);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.45)}
+  #dial::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--accent);cursor:pointer}
+  #dialNote{font-size:11.5px;color:var(--muted);text-align:center;margin-top:6px;min-height:14px}
   .post-btn{display:block;width:100%;max-width:520px;margin:0 auto 8px;background:transparent;
     border:1px dashed var(--line);color:var(--muted);font-family:inherit;font-size:13px;
     padding:9px 12px;border-radius:10px;cursor:pointer;transition:all .14s ease}
@@ -188,6 +196,11 @@
         <button id="dislikeBtn" class="rate-btn" title="Less like this (↓)">&#128078;</button>
         <button id="nextClip">&#9197;&nbsp; Next clip</button>
         <span id="nowPlaying"></span>
+      </div>
+      <div class="dial-box">
+        <div class="dial-labels"><span>🧭 what I should watch</span><span>❤️ what I love</span></div>
+        <input id="dial" type="range" min="0" max="100" value="70" />
+        <div id="dialNote"></div>
       </div>
       <button id="postBtn" class="post-btn">📝 Create a LinkedIn post from this clip</button>
       <div id="postPanel" class="hidden">
@@ -643,6 +656,15 @@ function clipWeight(i, lanes){
   return base*taste*superMult*lane*variety*fresh;
 }
 
+/* purpose weight from the 0..10 mission score (5 = neutral if unscored) */
+function purWeight(i){ const p=PURPOSE[VIDEOS[i].id]; return Math.pow(1.5, (p==null?5:p)-5); }
+/* blend preference and purpose by the dial: 1=all preference, 0=all purpose */
+function blendWeight(i, lanes){
+  const pref=clipWeight(i, lanes);
+  if(DIAL>=0.999) return pref;                       // pure "what I love"
+  if(DIAL<=0.001) return purWeight(i);               // pure "what I should watch"
+  return Math.pow(pref, DIAL) * Math.pow(purWeight(i), 1-DIAL);
+}
 function disliked(i){ const t=TASTE[VIDEOS[i].id]; return t && ((t.up||0)-(t.down||0))<=-1; }  // 👎 = out
 function pickVid(){
   const lanes=laneStats();
@@ -650,7 +672,7 @@ function pickVid(){
   let cands=VIDEOS.map((v,i)=>i).filter(i=>!disliked(i) && !recent.has(i));
   if(!cands.length) cands=VIDEOS.map((v,i)=>i).filter(i=>!disliked(i));  // drop the no-repeat window
   if(!cands.length) cands=VIDEOS.map((v,i)=>i);                          // everything disliked → show anyway
-  const weighted=cands.map(i=>({i, w:clipWeight(i, lanes)}));
+  const weighted=cands.map(i=>({i, w:blendWeight(i, lanes)}));
   const total=weighted.reduce((s,c)=>s+c.w,0);
   let r=Math.random()*total, idx=weighted[weighted.length-1].i;
   for(const c of weighted){ r-=c.w; if(r<=0){ idx=c.i; break; } }
@@ -840,6 +862,10 @@ function resumeFocus(){ $("snapback").classList.add("hidden"); startSession(); }
    for the hosted team page (leave "" to keep it hidden when hosted). */
 const HOSTED = !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 const POST_BACKEND = "https://focus-companion-api.onrender.com";   // Render API for LinkedIn posts
+/* clip-id -> 0..10 mission-alignment score (written by score.py from your purpose profile) */
+const PURPOSE = {"kHvXpDPd9pk": 4, "OhWDcTBSMc4": 3, "M2Ljr16KyuI": 5, "slMAem1MJk8": 5, "2SZJWmdEZOI": 4, "y6AlvUSMpho": 7, "jIkiQldezcw": 7, "A4FcqgLB1M4": 7, "lHIyPJmtkVw": 4, "LsIcMc9_yP8": 5, "KFQZzhwz4Z0": 5, "78KYzwhiNok": 5, "KOeyEIh7LIE": 8, "k2JZgWIbeFQ": 8, "HzOhrgrZjHA": 6, "3TCQ7ftEXRo": 5, "5ZCmM2XRLvM": 6, "a1Wsy4jccNA": 8, "b0Eq8Aib4GU": 7, "_3cxNAzpLmA": 6, "0igk-GNnqGw": 9, "RZPlIwCTfIQ": 6, "2oqJzaQeusc": 7, "_opnChqv44c": 7, "pMKqTTlFW9A": 6, "2Dukoqs-Fzg": 6, "L_zH3o-22JU": 7, "stUXqY02ow8": 7, "KoOYdDPIyNw": 5, "7cVPTM_EYtM": 7, "_7YKuOwZegs": 6, "yxZRPVD4rV0": 6, "b1UQdVijtHU": 8, "awdWc04m1ZE": 7, "qZdth96UA-c": 7, "LIxvQMhttq4": 7, "qIms7loBZnw": 6, "6rCX8D2SZag": 5, "NqVoOC2azZI": 5, "uHvD0DVcKAw": 5, "7mNtkzUTjYM": 5, "95xkeaFH0Cw": 7, "izo-wCS1Hp0": 6, "ndP8MBaeaDQ": 2, "fTwXS2H_iJo": 7, "Hdr6yCnqT8E": 8, "0pP3ZjMDzF4": 6, "Bubd7lvD7jA": 2, "T7l6tFsK62Y": 2, "X1-Gz5Bv3W8": 7, "GLJCF7nAt8w": 4, "rMMtLLK_mLE": 3, "zITgl5z9pR0": 6, "Fs3dqs_kFjA": 6, "UbkB-vhjhHA": 4, "Uu2q7ki5CmY": 1, "PxSjXX5R6UA": 4, "nONgw3LGn5g": 5, "0FE_EHfGadA": 3, "AJPcAeTX6wU": 9, "v8BcjcnFa3Y": 4, "EdZWPB1fIJc": 6, "NhSKmFuce9c": 3, "QFDz6q-Qthk": 5, "NJinI8SDf3M": 4, "6k15v-FpKvQ": 7, "efXOYGS6UFU": 6, "a3TTFErF3FY": 6, "ePRXwGoD6QI": 5, "jjMHMF7nt_U": 4, "n6e3olEkgx4": 3, "DxycrM1DzTM": 3, "2ufexqL_nl4": 3, "Az_cs7YUW1c": 1, "CafxJIY34ms": 1, "vYIO5ELTtBI": 6, "uwpC6UjXEog": 5, "fi1RF01-66Q": 7, "UohR3OXzXA8": 8, "GBc6vj5-wko": 8, "7Lz3QHxbmiQ": 6, "Kj2lxDf9R3Y": 7, "XPAaHQCtG0o": 8, "6DueNB2JhH8": 8, "IgiesTzF-TA": 7, "IdEMPSDFwuE": 9, "DSk5RsUD9j4": 6, "QML5mXbT8pU": 7, "tDu_onvlr44": 5, "JDigMfBSvYo": 6, "1obenX3KQaU": 4, "tzWGfi4XhLA": 7, "It4Zbshd9uk": 7};
+/* the dial: 1 = pure preference (what I love), 0 = pure purpose (what I should watch). */
+let DIAL = 0.7;
 
 function init(){
   buildPeople();
@@ -866,6 +892,13 @@ function init(){
   $("postBtn").onclick=makePost;
   $("copyBtn").onclick=copyPost;
   $("statsBtn").onclick=showStats;
+  const dl=$("dial"), saved=localStorage.getItem("fc_dial");
+  if(saved!=null){ DIAL=(+saved)/100; dl.value=saved; }
+  const dialNote=()=>{ const p=Math.round(DIAL*100);
+    $("dialNote").textContent = p>=85 ? "mostly what you love" : p<=15 ? "mostly growth — what you should watch"
+      : (p+"% what you love · "+(100-p)+"% growth"); };
+  dl.addEventListener("input",()=>{ DIAL=(+dl.value)/100; localStorage.setItem("fc_dial",dl.value); dialNote(); });
+  dialNote();
   $("backBtn").onclick=snapBack;
   $("resumeBtn").onclick=resumeFocus;
 
